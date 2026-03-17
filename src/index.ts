@@ -1,11 +1,10 @@
 import * as vertex from './vert'
 import * as frag from './frag'
-import {mat4} from 'gl-matrix'
+import * as utils from './utils'
+import {mat4, ReadonlyVec3} from 'gl-matrix'
+import { loadOBJs } from './files';
 
 const taskId = document.title;
-
-const canvas : HTMLCanvasElement = document.getElementById("canvas") as HTMLCanvasElement;
-const gl : WebGL2RenderingContext = canvas.getContext("webgl2")!;
 
 let rotationX = 0.0;
 let rotationY = 0.0;
@@ -15,100 +14,51 @@ const speed = 1.0;
 
 let keyPressed: string;
 
-const cubeVertices = [
-    -1.0, -1.0,  1.0,
-     1.0, -1.0,  1.0,
-     1.0,  1.0,  1.0,
-    -1.0,  1.0,  1.0,
-    -1.0, -1.0, -1.0,
-     1.0, -1.0, -1.0,
-     1.0,  1.0, -1.0,
-    -1.0,  1.0, -1.0 
-];
+let snowmanOBJ: utils.OBJ;
 
-const cubeIndices = [
-    // Front
-    0, 1, 2,
-    0, 2, 3,
-    // Right
-    1, 5, 6,
-    1, 6, 2,
-    // Back
-    5, 4, 7,
-    5, 7, 6,
-    // Left
-    4, 0, 3,
-    4, 3, 7,
-    // Top
-    3, 2, 6,
-    3, 6, 7,
-    // Bottom
-    4, 5, 1,
-    4, 1, 0
-];
+utils.setupGL();
+const gl = utils.gl;
 
-let vertexPosLoc: number;
-let vertexColorLoc: number;
-
-function handleShaderError(shader: WebGLShader) {
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {    
-        console.warn('An error occurred compiling the vertex shader:\n' + gl.getShaderInfoLog(shader));    
-        gl.deleteShader(shader);
-    } 
-}
-
-function initShaderProgram(vert: string, frag: string) : WebGLProgram {
-    const vertShader = gl.createShader(gl.VERTEX_SHADER);
-    const fragShader = gl.createShader(gl.FRAGMENT_SHADER);
-
-    gl.shaderSource(vertShader, vert);
-    gl.shaderSource(fragShader, frag);
-
-    gl.compileShader(vertShader);
-    handleShaderError(vertShader);
-    
-    gl.compileShader(fragShader);
-    handleShaderError(fragShader);
-
-    const shaderProgram = gl.createProgram();
-    gl.attachShader(shaderProgram, vertShader);
-    gl.attachShader(shaderProgram, fragShader);
-
-    gl.linkProgram(shaderProgram);
-    if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {    
-        console.warn('Unable to initialize the shader program:\n' + gl.getProgramInfoLog(shaderProgram));
-    }
-    
-    vertexPosLoc = gl.getAttribLocation(shaderProgram, 'inPosition');
-    vertexColorLoc = gl.getAttribLocation(shaderProgram, 'inColor');
-
-    return shaderProgram
-}
-
-function createFloatBuffer(data: Float32Array, type: GLenum) : WebGLBuffer {
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(type, buffer);
-    gl.bufferData(type, data, gl.STATIC_DRAW);
-    return buffer;
-}
-function createUint16Buffer(data: Uint16Array, type: GLenum) : WebGLBuffer {
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(type, buffer);
-    gl.bufferData(type, data, gl.STATIC_DRAW);
-    return buffer;
-}
-
-function drawCube(vertices: WebGLBuffer, indices: WebGLBuffer, colors: WebGLBuffer) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
+function drawModel(vertexPosLoc: number, vertexNormalLoc: number, renderObj: utils.RenderObj) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, renderObj.verticesBuffer);
     gl.vertexAttribPointer(vertexPosLoc, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vertexPosLoc);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, colors);
-    gl.vertexAttribPointer(vertexColorLoc, 4, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vertexColorLoc);
+    gl.bindBuffer(gl.ARRAY_BUFFER, renderObj.normalsBuffer);
+    gl.vertexAttribPointer(vertexNormalLoc, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vertexNormalLoc);
 
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices);
-    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, renderObj.indicesBuffer);
+    gl.drawElements(gl.TRIANGLES, renderObj.elementsCount, gl.UNSIGNED_SHORT, 0);
+}
+
+function drawObject(
+    shader: WebGLShader,
+    pos: ReadonlyVec3,
+    viewProjection: mat4,
+    renderObj: utils.RenderObj
+) {
+    gl.useProgram(shader);
+
+    let vertexPosLoc = gl.getAttribLocation(shader, "inPosition");
+    let vertexNormalLoc = gl.getAttribLocation(shader, "inNormal");
+
+    let viewProjectionLoc = gl.getUniformLocation(shader, "viewProjection");
+    let modelLoc = gl.getUniformLocation(shader, "model");
+    gl.uniformMatrix4fv(viewProjectionLoc, false, viewProjection as Float32Array);
+
+    let lightPosLoc = gl.getUniformLocation(shader, "lightPosition");
+    let lightColorLoc = gl.getUniformLocation(shader, "lightColor");
+    gl.uniform3fv(lightPosLoc, [0.0, 5.0, 2.0]);
+    gl.uniform3fv(lightColorLoc, [1.0, 1.0, 1.0]);
+
+    let model = mat4.create();
+    mat4.translate(model, model, [pos[0] + moveX, pos[1], pos[2]]);
+    mat4.rotate(model, model, rotationY * (Math.PI / 180), [1.0, 0.0, 0.0]);
+    mat4.rotate(model, model, rotationX * (Math.PI / 180), [0.0, 1.0, 0.0]);
+    mat4.scale(model, model, [scale, scale, scale]);
+    gl.uniformMatrix4fv(modelLoc, false, model as Float32Array);
+    drawModel(vertexPosLoc, vertexNormalLoc, renderObj);
 }
 
 function input() {
@@ -153,18 +103,12 @@ function input() {
     }
 }
 
-function taskPatterns() {
-    const shaderHorizontal = initShaderProgram(vertex.shader, frag.shaderStripsHorizontal);
-    const shaderDiagonal = initShaderProgram(vertex.shader, frag.shaderStripsDiagonal);
-    const shaderSquares = initShaderProgram(vertex.shader, frag.shaderSquares);
+function task() {
+    const shaderPhong = utils.initShaderProgram(vertex.shaderPhong, frag.shaderLambert);
     
-    const verticesBuffer = createFloatBuffer(new Float32Array(cubeVertices), gl.ARRAY_BUFFER);
-    const indicesBuffer = createUint16Buffer(new Uint16Array(cubeIndices), gl.ELEMENT_ARRAY_BUFFER);
-
-    const colorSize = cubeVertices.length / 3 * 4;
-    let colors = new Array(colorSize);
-    for(let i = 0; i < colorSize; i++) {colors[i] = 1.0};
-    const colorsBuffer = createFloatBuffer(new Float32Array(colors), gl.ARRAY_BUFFER);
+    const verticesBuffer = utils.createFloatBuffer(snowmanOBJ.vertices, gl.ARRAY_BUFFER);
+    const normalsBuffer = utils.createFloatBuffer(snowmanOBJ.normals, gl.ARRAY_BUFFER);
+    const indicesBuffer = utils.createUint16Buffer(snowmanOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
 
     function render() {
         input();
@@ -177,99 +121,15 @@ function taskPatterns() {
 
         let viewProjection = mat4.create();
         mat4.perspective(viewProjection, 45, 1200.0 / 800.0, 0.1, 100.0);
+
+
         
-        ///
-        gl.useProgram(shaderHorizontal);
-
-        let viewProjectionLoc = gl.getUniformLocation(shaderHorizontal, "viewProjection");
-        let modelLoc = gl.getUniformLocation(shaderHorizontal, "model");
-        gl.uniformMatrix4fv(viewProjectionLoc, false, viewProjection as Float32Array);
-
-        let model = mat4.create();
-        mat4.translate(model, model, [-3.0 + moveX, 0.0, -6.0]);
-        mat4.rotate(model, model, rotationY * (Math.PI / 180), [1.0, 0.0, 0.0]);
-        mat4.rotate(model, model, rotationX * (Math.PI / 180), [0.0, 1.0, 0.0]);
-        mat4.scale(model, model, [scale, scale, scale]);
-        gl.uniformMatrix4fv(modelLoc, false, model as Float32Array);
-        drawCube(verticesBuffer, indicesBuffer, colorsBuffer);
-
-        ///
-        gl.useProgram(shaderDiagonal);
-
-        viewProjectionLoc = gl.getUniformLocation(shaderDiagonal, "viewProjection");
-        modelLoc = gl.getUniformLocation(shaderDiagonal, "model");
-        gl.uniformMatrix4fv(viewProjectionLoc, false, viewProjection as Float32Array);
-
-        model = mat4.create();
-        mat4.translate(model, model, [0.0 + moveX, 0.0, -6.0]);
-        mat4.rotate(model, model, rotationY * (Math.PI / 180), [1.0, 0.0, 0.0]);
-        mat4.rotate(model, model, rotationX * (Math.PI / 180), [0.0, 1.0, 0.0]);
-        mat4.scale(model, model, [scale, scale, scale]);
-        gl.uniformMatrix4fv(modelLoc, false, model as Float32Array);
-        drawCube(verticesBuffer, indicesBuffer, colorsBuffer);
-
-        ///
-        gl.useProgram(shaderSquares);
-
-        viewProjectionLoc = gl.getUniformLocation(shaderSquares, "viewProjection");
-        modelLoc = gl.getUniformLocation(shaderSquares, "model");
-        gl.uniformMatrix4fv(viewProjectionLoc, false, viewProjection as Float32Array);
-
-        model = mat4.create();
-        mat4.translate(model, model, [3.0 + moveX, 0.0, -6.0]);
-        mat4.rotate(model, model, rotationY * (Math.PI / 180), [1.0, 0.0, 0.0]);
-        mat4.rotate(model, model, rotationX * (Math.PI / 180), [0.0, 1.0, 0.0]);
-        mat4.scale(model, model, [scale, scale, scale]);
-        gl.uniformMatrix4fv(modelLoc, false, model as Float32Array);
-        drawCube(verticesBuffer, indicesBuffer, colorsBuffer);
-
-        requestAnimationFrame(render);
-    }
-    render();
-}
-
-function taskColors() {
-    const shaderColors = initShaderProgram(vertex.shader, frag.shaderColors);
-
-    const verticesBuffer = createFloatBuffer(new Float32Array(cubeVertices), gl.ARRAY_BUFFER);
-    const indicesBuffer = createUint16Buffer(new Uint16Array(cubeIndices), gl.ELEMENT_ARRAY_BUFFER);
-
-    let colors = [
-        1.0, 0.0, 0.0, 1.0,
-        0.0, 1.0, 0.0, 1.0,
-        0.0, 0.0, 1.0, 1.0,
-        0.0, 0.0, 0.0, 1.0,
-        1.0, 1.0, 1.0, 1.0,
-        0.5, 0.5, 0.5, 1.0,
-    ];
-    const colorsBuffer = createFloatBuffer(new Float32Array(colors), gl.ARRAY_BUFFER);
-
-    function render() {
-        input();
-
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);
-        gl.clearDepth(1.0);
-        gl.enable(gl.DEPTH_TEST);
-        gl.depthFunc(gl.LEQUAL);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-        let viewProjection = mat4.create();
-        mat4.perspective(viewProjection, 45, 1200.0 / 800.0, 0.1, 100.0);
-        
-        ///
-        gl.useProgram(shaderColors);
-
-        let viewProjectionLoc = gl.getUniformLocation(shaderColors, "viewProjection");
-        let modelLoc = gl.getUniformLocation(shaderColors, "model");
-        gl.uniformMatrix4fv(viewProjectionLoc, false, viewProjection as Float32Array);
-
-        let model = mat4.create();
-        mat4.translate(model, model, [moveX, 0.0, -6.0]);
-        mat4.rotate(model, model, rotationY * (Math.PI / 180), [1.0, 0.0, 0.0]);
-        mat4.rotate(model, model, rotationX * (Math.PI / 180), [0.0, 1.0, 0.0]);
-        mat4.scale(model, model, [scale, scale, scale]);
-        gl.uniformMatrix4fv(modelLoc, false, model as Float32Array);
-        drawCube(verticesBuffer, indicesBuffer, colorsBuffer);
+        drawObject(shaderPhong, [0.0, 0.0, -6.0], viewProjection, {
+            elementsCount: snowmanOBJ.indices.length,
+            verticesBuffer: verticesBuffer,
+            normalsBuffer: normalsBuffer,
+            indicesBuffer: indicesBuffer
+        });
 
         requestAnimationFrame(render);
     }
@@ -278,11 +138,8 @@ function taskColors() {
 
 function main() {
     switch (taskId) {
-        case 'Patterns':
-            taskPatterns();
-            break;
-        case 'Colors':
-            taskColors();
+        case 'Light':
+            task();
             break;
     }
 }
@@ -294,4 +151,10 @@ window.addEventListener('keyup', (event) => {
     keyPressed = undefined;
 })
 
-main();
+loadOBJs().then(result => {
+    snowmanOBJ = utils.loadObj(result.snowman);
+    
+    //console.log(result.snowman);
+
+    main();
+});

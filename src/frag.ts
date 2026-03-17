@@ -1,77 +1,38 @@
-export const shaderStripsHorizontal = `#version 300 es
+export const shaderUnlit = `#version 300 es
 precision mediump float;
 
-in vec4 fragColor;
 in vec3 vPosition;
+in vec3 vNormal;
 
 out vec4 outColor;
 
 void main() {
-    float scale = 5.0;
-
-    int stripe = int(vPosition.y * scale);
-
-    if ((stripe - (stripe / 2 * 2)) == 0) {
-        outColor = fragColor;
-    }
-    else {
-        outColor = vec4(0.0, 0.0, 1.0, fragColor.a);
-    }
+    outColor = vec4(0.0, 0.0, 1.0, 1.0);
 }
 `
 
-export const shaderStripsDiagonal = `#version 300 es
+export const shaderLambert = `#version 300 es
 precision mediump float;
 
-in vec4 fragColor;
+uniform vec3 lightPosition;
+uniform vec3 lightColor;
+
 in vec3 vPosition;
+in vec3 vNormal;
 
 out vec4 outColor;
 
 void main() {
-    float scale = 5.0;
+    // I = kd * max( dot(N, L), 0 )
+    vec3 normal = normalize(vNormal);
+    
+    vec3 L = lightPosition - vPosition;
+    float distance = length(L);
+    L = normalize(L);
 
-    int stripe = int((vPosition.x + vPosition.y + vPosition.z) * scale);
+    float diff = max(dot(normal, L), 0.0);
+    float attenuation = 25.0 / (distance * distance);
 
-    if ((stripe - (stripe / 2 * 2)) == 0) {
-        outColor = fragColor;
-    }
-    else {
-        outColor = vec4(0.0, 1.0, 0.0, fragColor.a);
-    }
-}
-`
-
-export const shaderSquares = `#version 300 es
-precision mediump float;
-
-in vec4 fragColor;
-in vec3 vPosition;
-
-out vec4 outColor;
-
-void main() {
-    float scale = 2.0;
-
-    int sum = int(vPosition.x * scale) + int(vPosition.y * scale) + int(vPosition.z * scale);
-    if ((sum - (sum / 2 * 2)) == 0) {
-        outColor = vec4(1.0, 0.0, 0.0, 1.0);
-    }
-    else {
-        outColor = fragColor;
-    }
-}
-`
-
-export const shaderColors = `#version 300 es
-precision mediump float;
-
-in vec4 fragColor;
-in vec3 vPosition;
-
-out vec4 outColor;
-
-void main() {
-    outColor = fragColor;
+    outColor = vec4(vec3(0.0, 0.0, 1.0) * lightColor * diff * attenuation, 1.0);
 }
 `
