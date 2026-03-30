@@ -9,8 +9,21 @@ const taskId = document.title;
 let rotationX = 0.0;
 let rotationY = 0.0;
 let scale = 0.75;
-let moveX = 0; 
+let moveX = 0.0; 
+let lightIntensivity = 5.0;
+let lightLinear = 0.09;
+let lightQuadratic = 0.032;
+let isPhongShading = true;
+let ambient = 0;
+let diff = 1;
+let specular = 0.5;
 const speed = 1.0;
+
+let lightModel = 0; const lightModelMax = 1;
+const lightModelNames = {
+    0: 'Lambert',
+    1: 'Phong'
+}
 
 let keyPressed: string;
 
@@ -49,8 +62,21 @@ function drawObject(
 
     let lightPosLoc = gl.getUniformLocation(shader, "lightPosition");
     let lightColorLoc = gl.getUniformLocation(shader, "lightColor");
+    let lightIntensLoc = gl.getUniformLocation(shader, "lightIntensivity");
+    let lightLinLoc = gl.getUniformLocation(shader, "lightLinear");
+    let lightQuadLoc = gl.getUniformLocation(shader, "lightQuadratic");
     gl.uniform3fv(lightPosLoc, [0.0, 5.0, 2.0]);
     gl.uniform3fv(lightColorLoc, [1.0, 1.0, 1.0]);
+    gl.uniform1f(lightIntensLoc, lightIntensivity);
+    gl.uniform1f(lightLinLoc, lightLinear);
+    gl.uniform1f(lightQuadLoc, lightQuadratic);
+
+    let ambientLoc = gl.getUniformLocation(shader, 'ambientI');
+    let diffuseLoc = gl.getUniformLocation(shader, 'diffuseI');
+    let specularLoc = gl.getUniformLocation(shader, 'specularI');
+    gl.uniform1f(ambientLoc, ambient);
+    gl.uniform1f(diffuseLoc, diff);
+    gl.uniform1f(specularLoc, specular);
 
     let model = mat4.create();
     mat4.translate(model, model, [pos[0] + moveX, pos[1], pos[2]]);
@@ -61,50 +87,44 @@ function drawObject(
     drawModel(vertexPosLoc, vertexNormalLoc, renderObj);
 }
 
+const inputHandlers = {
+    'ArrowLeft': () => {rotationX += speed},
+    'ArrowRight': () => {rotationX -= speed},
+    'ArrowUp': () => {rotationY += speed},
+    'ArrowDown': () => {rotationY -= speed},
+    'Q': () => {scale -= speed * 0.01},
+    'E': () => {scale += speed * 0.01},
+    'q': () => {moveX -= speed * 0.1},
+    'e': () => {moveX += speed * 0.1},
+    '=': () => {lightIntensivity += speed * 0.5},
+    '-': () => {lightIntensivity -= speed * 0.5},
+    '+': () => {lightQuadratic += speed * 0.005;},
+    '_': () => {lightQuadratic -= speed * 0.005;},
+    '9': () => {lightLinear -= speed * 0.01;},
+    '0': () => {lightLinear += speed * 0.01;},
+    'a': () => {ambient -= speed * 0.01;},
+    'd': () => {ambient += speed * 0.01;},
+    'A': () => {diff -= speed * 0.01;},
+    'D': () => {diff += speed * 0.01;},
+    'z': () => {specular -= speed * 0.01;},
+    'c': () => {specular += speed * 0.01;},
+};
+
 function input() {
     if (!keyPressed) return;
-
-    switch (keyPressed) {
-        case 'ArrowLeft':
-            rotationX += speed;
-            break;
-
-        case 'ArrowRight':
-            rotationX -= speed;
-            break;
-
-        case 'ArrowUp':
-            rotationY += speed;
-            break;
-
-        case 'ArrowDown':
-            rotationY -= speed;
-            break;
-
-        case 'Q':
-            scale += speed * 0.01;
-            break;
-
-        case 'E':
-            scale -= speed * 0.01;
-            if (scale < 0) scale = 0;
-            break;
-
-        case 'q':
-            moveX += speed * 0.1;
-            break;
-
-        case 'e':
-            moveX -= speed * 0.1;
-            break;
-
-        default:
-            break;
-    }
+    let handler = inputHandlers[keyPressed];
+    if (handler)
+        handler();
 }
 
 function task() {
-    const shaderPhong = utils.initShaderProgram(vertex.shaderPhong, frag.shaderLambert);
+    console.log(`Shading ${isPhongShading ? 'Phong' : 'Gouraud'}, Model: ${lightModel ? 'Phong' : 'Lambert'}`);
+
+    const shaderPhongLambert = utils.initShaderProgram(vertex.shaderPhong, frag.shaderLambert);
+    const shaderPhongPhong = utils.initShaderProgram(vertex.shaderPhong, frag.shaderPhong);
+    const shaderGouraudLambert = utils.initShaderProgram(vertex.shaderGouraudLambert, frag.shaderGouraud);
+    const shaderGouraudPhong = utils.initShaderProgram(vertex.shaderGouraudPhong, frag.shaderGouraud);
+    let shader: WebGLProgram;
     
     const verticesBuffer = utils.createFloatBuffer(snowmanOBJ.vertices, gl.ARRAY_BUFFER);
     const normalsBuffer = utils.createFloatBuffer(snowmanOBJ.normals, gl.ARRAY_BUFFER);
@@ -122,9 +142,14 @@ function task() {
         let viewProjection = mat4.create();
         mat4.perspective(viewProjection, 45, 1200.0 / 800.0, 0.1, 100.0);
 
+        if (isPhongShading) {
+            shader = lightModel ? shaderPhongPhong : shaderPhongLambert;
+        }
+        else {
+            shader = lightModel ? shaderGouraudPhong : shaderGouraudLambert;
+        }
 
-        
-        drawObject(shaderPhong, [0.0, 0.0, -6.0], viewProjection, {
+        drawObject(shader, [0.0, 0.0, -6.0], viewProjection, {
             elementsCount: snowmanOBJ.indices.length,
             verticesBuffer: verticesBuffer,
             normalsBuffer: normalsBuffer,
@@ -148,6 +173,19 @@ window.addEventListener('keydown', (event) => {
     keyPressed = event.key;
 })
 window.addEventListener('keyup', (event) => {
+    switch(event.key) {
+        case 'g':
+            isPhongShading = !isPhongShading;
+            console.log(`Shading ${isPhongShading ? 'Phong' : 'Gouraud'}, Model: ${lightModelNames[lightModel]}`);
+            break;
+
+        case 'l':
+            lightModel++;
+            if (lightModel > lightModelMax) lightModel = 0;
+            console.log(`Shading ${isPhongShading ? 'Phong' : 'Gouraud'}, Model: ${lightModelNames[lightModel]}`);
+            break;
+    }
+
     keyPressed = undefined;
 })
 
