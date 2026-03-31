@@ -9,6 +9,8 @@ export async function readFile(path:string) {
 
 export async function loadOBJs() {
     return {
-        snowman: await readFile('snowman.obj')
+        snowman: await readFile('snowman.obj'),
+        grenade: await readFile('grenade.obj'),
+        mug: await readFile('mug.obj')
     };
 }

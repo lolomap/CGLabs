@@ -28,6 +28,8 @@ const lightModelNames = {
 let keyPressed: string;
 
 let snowmanOBJ: utils.OBJ;
+let grenadeOBJ: utils.OBJ;
+let mugOBJ: utils.OBJ;
 
 utils.setupGL();
 const gl = utils.gl;
@@ -49,7 +51,8 @@ function drawObject(
     shader: WebGLShader,
     pos: ReadonlyVec3,
     viewProjection: mat4,
-    renderObj: utils.RenderObj
+    renderObj: utils.RenderObj,
+    scaleModifier
 ) {
     gl.useProgram(shader);
 
@@ -82,7 +85,7 @@ function drawObject(
     mat4.translate(model, model, [pos[0] + moveX, pos[1], pos[2]]);
     mat4.rotate(model, model, rotationY * (Math.PI / 180), [1.0, 0.0, 0.0]);
     mat4.rotate(model, model, rotationX * (Math.PI / 180), [0.0, 1.0, 0.0]);
-    mat4.scale(model, model, [scale, scale, scale]);
+    mat4.scale(model, model, [scale * scaleModifier, scale  * scaleModifier, scale  * scaleModifier]);
     gl.uniformMatrix4fv(modelLoc, false, model as Float32Array);
     drawModel(vertexPosLoc, vertexNormalLoc, renderObj);
 }
@@ -126,9 +129,17 @@ function task() {
     const shaderGouraudPhong = utils.initShaderProgram(vertex.shaderGouraudPhong, frag.shaderGouraud);
     let shader: WebGLProgram;
     
-    const verticesBuffer = utils.createFloatBuffer(snowmanOBJ.vertices, gl.ARRAY_BUFFER);
-    const normalsBuffer = utils.createFloatBuffer(snowmanOBJ.normals, gl.ARRAY_BUFFER);
-    const indicesBuffer = utils.createUint16Buffer(snowmanOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
+    const snowman_verticesBuffer = utils.createFloatBuffer(snowmanOBJ.vertices, gl.ARRAY_BUFFER);
+    const snowman_normalsBuffer = utils.createFloatBuffer(snowmanOBJ.normals, gl.ARRAY_BUFFER);
+    const snowman_indicesBuffer = utils.createUint16Buffer(snowmanOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
+
+    const grenade_verticesBuffer = utils.createFloatBuffer(grenadeOBJ.vertices, gl.ARRAY_BUFFER);
+    const grenade_normalsBuffer = utils.createFloatBuffer(grenadeOBJ.normals, gl.ARRAY_BUFFER);
+    const grenade_indicesBuffer = utils.createUint16Buffer(grenadeOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
+
+    const mug_verticesBuffer = utils.createFloatBuffer(mugOBJ.vertices, gl.ARRAY_BUFFER);
+    const mug_normalsBuffer = utils.createFloatBuffer(mugOBJ.normals, gl.ARRAY_BUFFER);
+    const mug_indicesBuffer = utils.createUint16Buffer(mugOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
 
     function render() {
         input();
@@ -151,10 +162,24 @@ function task() {
 
         drawObject(shader, [0.0, 0.0, -6.0], viewProjection, {
             elementsCount: snowmanOBJ.indices.length,
-            verticesBuffer: verticesBuffer,
-            normalsBuffer: normalsBuffer,
-            indicesBuffer: indicesBuffer
-        });
+            verticesBuffer: snowman_verticesBuffer,
+            normalsBuffer: snowman_normalsBuffer,
+            indicesBuffer: snowman_indicesBuffer
+        }, 1.0);
+
+        drawObject(shader, [3.0, 0.0, -6.0], viewProjection, {
+            elementsCount: grenadeOBJ.indices.length,
+            verticesBuffer: grenade_verticesBuffer,
+            normalsBuffer: grenade_normalsBuffer,
+            indicesBuffer: grenade_indicesBuffer
+        }, 0.25);
+
+        drawObject(shader, [-4.0, 0.0, -6.0], viewProjection, {
+            elementsCount: mugOBJ.indices.length,
+            verticesBuffer: mug_verticesBuffer,
+            normalsBuffer: mug_normalsBuffer,
+            indicesBuffer: mug_indicesBuffer
+        }, 1.0);
 
         requestAnimationFrame(render);
     }
@@ -191,7 +216,8 @@ window.addEventListener('keyup', (event) => {
 
 loadOBJs().then(result => {
     snowmanOBJ = utils.loadObj(result.snowman);
-    
+    grenadeOBJ = utils.loadObj(result.grenade);
+    mugOBJ = utils.loadObj(result.mug);
     //console.log(result.snowman);
 
     main();
