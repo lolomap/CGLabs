@@ -94,3 +94,53 @@ void main() {
     outColor = vec4(lightWeighting.rgb * vec3(0.0, 1.0, 0.0), 1.0);
 }
 `
+
+export const shaderPhongTextured = `#version 300 es
+precision mediump float;
+
+uniform vec3 lightPosition;
+uniform vec3 lightColor;
+uniform float lightIntensivity;
+uniform float lightQuadratic;
+uniform float lightLinear;
+
+uniform float ambientI;
+uniform float diffuseI;
+uniform float specularI;
+
+uniform vec4 tint;
+uniform sampler2D sampler;
+
+in vec3 vPosition;
+in vec3 vNormal;
+in vec2 vUV;
+
+out vec4 outColor;
+
+void main() {
+    vec3 normal = normalize(vNormal);
+
+    vec3 lightDirection = lightPosition - vPosition;
+    float distance = length(lightDirection);
+    lightDirection = normalize(lightDirection);
+
+    float diff = max(dot(normal, lightDirection), 0.0);
+    float attenuation = lightIntensivity / (1.0 + lightLinear * distance + lightQuadratic * distance * distance);
+
+    float specular = max(dot(
+        normalize(reflect(-lightDirection, normal)),
+        -normalize(vPosition)
+    ), 0.0);
+
+    vec3 lightWeighting =
+        ambientI * lightColor +
+        attenuation * diffuseI * lightColor * diff +
+        attenuation * specularI * lightColor * pow(specular, lightIntensivity);
+
+    vec4 textureColor = texture(sampler, vUV);
+    vec4 color = tint * textureColor;
+    
+    //outColor = color;
+    outColor = vec4(lightWeighting.rgb * color.rgb, 1.0);
+}
+`

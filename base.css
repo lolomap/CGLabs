@@ -7,3 +7,8 @@
 .canvas {
     height: 100%;
 }
+
+.textures-container img {
+    height: 0px;
+    width: 0px;
+}
