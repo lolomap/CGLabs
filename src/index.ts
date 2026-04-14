@@ -17,6 +17,7 @@ let ambient = 0;
 let diff = 1;
 let specular = 0.5;
 let tint = -1;
+let textureMix = 0.5;
 const speed = 1.0;
 
 let keyPressed: string;
@@ -32,14 +33,17 @@ const imageTexture1 = document.getElementById("texture1");
 const imageTexture2 = document.getElementById("texture2"); 
 const imageTexture3 = document.getElementById("texture3");
 const imageTexturePigeon = document.getElementById("pigeon");
+const imageTextureWood = document.getElementById("wood");
 let texture1 = gl.createTexture(); waitLoadTexture(imageTexture1, texture1);
 let texture2 = gl.createTexture(); waitLoadTexture(imageTexture2, texture2);
 let texture3 = gl.createTexture(); waitLoadTexture(imageTexture3, texture3);
 let texturePigeon = gl.createTexture(); waitLoadTexture(imageTexturePigeon, texturePigeon);
+let textureWood = gl.createTexture(); waitLoadTexture(imageTextureWood, textureWood);
 imageTexture1.onload = () => utils.handleTextureLoaded(imageTexture1, texture1);
 imageTexture2.onload = () => utils.handleTextureLoaded(imageTexture2, texture2);
 imageTexture3.onload = () => utils.handleTextureLoaded(imageTexture3, texture3);
 imageTexturePigeon.onload = () => utils.handleTextureLoaded(imageTexturePigeon, texturePigeon);
+imageTextureWood.onload = () => utils.handleTextureLoaded(imageTextureWood, textureWood);
 
 function drawModel(
     vertexPosLoc: number,
@@ -100,10 +104,19 @@ function drawObject(
     gl.uniform1f(specularLoc, specular);
 
     let samplerLoc = gl.getUniformLocation(shader, 'sampler');
-    let tintLoc = gl.getUniformLocation(shader, 'tint');
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(samplerLoc, 0);
+    
+    let sampler2Loc = gl.getUniformLocation(shader, 'sampler2');
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, textureWood);
+    gl.uniform1i(sampler2Loc, 1);
+
+    let textureMixLoc = gl.getUniformLocation(shader, 'textureMix');
+    gl.uniform1f(textureMixLoc, textureMix)
+    
+    let tintLoc = gl.getUniformLocation(shader, 'tint');
     let tintColor = [0.3, 0.3, 0.3, 1.0];
     if (tint >= 0)
         tintColor[tint] = 1.0;
@@ -140,7 +153,9 @@ const inputHandlers = {
     'A': () => {diff -= speed * 0.01;},
     'D': () => {diff += speed * 0.01;},
     'z': () => {specular -= speed * 0.01;},
-    'c': () => {specular += speed * 0.01;}
+    'c': () => {specular += speed * 0.01;},
+    '1': () => {textureMix -= speed * 0.01},
+    '2': () => {textureMix += speed * 0.01},
 };
 
 function input() {

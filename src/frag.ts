@@ -110,6 +110,8 @@ uniform float specularI;
 
 uniform vec4 tint;
 uniform sampler2D sampler;
+uniform sampler2D sampler2;
+uniform float textureMix;
 
 in vec3 vPosition;
 in vec3 vNormal;
@@ -138,9 +140,9 @@ void main() {
         attenuation * specularI * lightColor * pow(specular, lightIntensivity);
 
     vec4 textureColor = texture(sampler, vUV);
-    vec4 color = tint * textureColor;
+    vec4 textureColor2 = texture(sampler2, vUV);
+    vec4 color = tint * mix(textureColor, textureColor2, textureMix);
     
-    //outColor = color;
     outColor = vec4(lightWeighting.rgb * color.rgb, 1.0);
 }
 `
