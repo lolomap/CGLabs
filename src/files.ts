@@ -15,6 +15,7 @@ export async function loadOBJs() {
         pigeon: await readFile('pigeon.obj'),
         snowman: await readFile('snowman.obj'),
         grenade: await readFile('grenade.obj'),
-        mug: await readFile('mug.obj')
+        mug: await readFile('mug.obj'),
+        rock: await readFile('rock.obj')
     };
 }

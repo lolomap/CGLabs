@@ -18,6 +18,7 @@ let diff = 1;
 let specular = 0.5;
 let tint = -1;
 let textureMix = 0.5;
+let bumpScale = 1;
 const speed = 1.0;
 
 let keyPressed: string;
@@ -28,22 +29,23 @@ const gl = utils.gl;
 let cubeOBJ: utils.OBJ;
 let sphereOBJ: utils.OBJ;
 let pigeonOBJ: utils.OBJ;
+let rockOBJ: utils.OBJ;
 
-const imageTexture1 = document.getElementById("texture1");
-const imageTexture2 = document.getElementById("texture2"); 
-const imageTexture3 = document.getElementById("texture3");
-const imageTexturePigeon = document.getElementById("pigeon");
-const imageTextureWood = document.getElementById("wood");
-let texture1 = gl.createTexture(); waitLoadTexture(imageTexture1, texture1);
-let texture2 = gl.createTexture(); waitLoadTexture(imageTexture2, texture2);
-let texture3 = gl.createTexture(); waitLoadTexture(imageTexture3, texture3);
-let texturePigeon = gl.createTexture(); waitLoadTexture(imageTexturePigeon, texturePigeon);
-let textureWood = gl.createTexture(); waitLoadTexture(imageTextureWood, textureWood);
-imageTexture1.onload = () => utils.handleTextureLoaded(imageTexture1, texture1);
-imageTexture2.onload = () => utils.handleTextureLoaded(imageTexture2, texture2);
-imageTexture3.onload = () => utils.handleTextureLoaded(imageTexture3, texture3);
-imageTexturePigeon.onload = () => utils.handleTextureLoaded(imageTexturePigeon, texturePigeon);
-imageTextureWood.onload = () => utils.handleTextureLoaded(imageTextureWood, textureWood);
+const orangeImageTexture = document.getElementById("orange");
+let orangeTexture = gl.createTexture(); waitLoadTexture(orangeImageTexture, orangeTexture);
+orangeImageTexture.onload = () => utils.handleTextureLoaded(orangeImageTexture, orangeTexture);
+
+const orangeHeightmapImageTexture = document.getElementById("orange-heightmap");
+let orangeHeightmapTexture = gl.createTexture(); waitLoadTexture(orangeHeightmapImageTexture, orangeHeightmapTexture);
+orangeHeightmapImageTexture.onload = () => utils.handleTextureLoaded(orangeHeightmapImageTexture, orangeHeightmapTexture);
+
+const rockImageTexture = document.getElementById("rock");
+let rockTexture = gl.createTexture(); waitLoadTexture(rockImageTexture, rockTexture);
+rockImageTexture.onload = () => utils.handleTextureLoaded(rockImageTexture, rockTexture);
+
+const rockNormalmapImageTexture = document.getElementById("rock-normalmap");
+let rockNormalmapTexture = gl.createTexture(); waitLoadTexture(rockNormalmapImageTexture, rockNormalmapTexture);
+rockNormalmapImageTexture.onload = () => utils.handleTextureLoaded(rockNormalmapImageTexture, rockNormalmapTexture);
 
 function drawModel(
     vertexPosLoc: number,
@@ -73,7 +75,8 @@ function drawObject(
     viewProjection: mat4,
     renderObj: utils.RenderObj,
     scaleModifier,
-    texture: WebGLTexture
+    texture: WebGLTexture,
+    map: WebGLTexture
 ) {
     gl.useProgram(shader);
 
@@ -108,19 +111,27 @@ function drawObject(
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(samplerLoc, 0);
     
-    let sampler2Loc = gl.getUniformLocation(shader, 'sampler2');
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, textureWood);
-    gl.uniform1i(sampler2Loc, 1);
+    //let sampler2Loc = gl.getUniformLocation(shader, 'sampler2');
+    //gl.activeTexture(gl.TEXTURE1);
+    //gl.bindTexture(gl.TEXTURE_2D, textureWood);
+    //gl.uniform1i(sampler2Loc, 1);
 
-    let textureMixLoc = gl.getUniformLocation(shader, 'textureMix');
-    gl.uniform1f(textureMixLoc, textureMix)
+    let mapLoc = gl.getUniformLocation(shader, 'map');
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, map);
+    gl.uniform1i(mapLoc, 1);
+
+    // let textureMixLoc = gl.getUniformLocation(shader, 'textureMix');
+    // gl.uniform1f(textureMixLoc, textureMix);
+
+    let bumpScaleLoc = gl.getUniformLocation(shader, 'bumpScale');
+    gl.uniform1f(bumpScaleLoc, bumpScale);
     
     let tintLoc = gl.getUniformLocation(shader, 'tint');
     let tintColor = [0.3, 0.3, 0.3, 1.0];
     if (tint >= 0)
         tintColor[tint] = 1.0;
-    else tintColor = [1.0, 1.0, 1.0, 1.0];
+    else tintColor = [1.0, 0.5, 0.0, 1.0];
     gl.uniform4fv(tintLoc, tintColor);
 
 
@@ -156,6 +167,8 @@ const inputHandlers = {
     'c': () => {specular += speed * 0.01;},
     '1': () => {textureMix -= speed * 0.01},
     '2': () => {textureMix += speed * 0.01},
+    'b': () => {bumpScale += speed * 0.01},
+    'B': () => {bumpScale -= speed * 0.01}
 };
 
 function input() {
@@ -166,17 +179,18 @@ function input() {
 }
 
 function task() {
-    const shader = utils.initShaderProgram(vertex.shaderPhongTextured, frag.shaderPhongTextured);
+    const bumpShader = utils.initShaderProgram(vertex.shaderPhongBumping, frag.shaderPhongBumping);
+    const normalShader = utils.initShaderProgram(vertex.shaderPhongBumping, frag.shaderPhongNormal);
     
-    const cube_verticesBuffer = utils.createFloatBuffer(cubeOBJ.vertices, gl.ARRAY_BUFFER);
-    const cube_normalsBuffer = utils.createFloatBuffer(cubeOBJ.normals, gl.ARRAY_BUFFER);
-    const cube_uvsBuffer = utils.createFloatBuffer(cubeOBJ.uvs, gl.ARRAY_BUFFER);
-    const cube_indicesBuffer = utils.createUint16Buffer(cubeOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
+    const sphere_verticesBuffer = utils.createFloatBuffer(sphereOBJ.vertices, gl.ARRAY_BUFFER);
+    const sphere_normalsBuffer = utils.createFloatBuffer(sphereOBJ.normals, gl.ARRAY_BUFFER);
+    const sphere_uvsBuffer = utils.createFloatBuffer(sphereOBJ.uvs, gl.ARRAY_BUFFER);
+    const sphere_indicesBuffer = utils.createUint16Buffer(sphereOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
 
-    const pigeon_verticesBuffer = utils.createFloatBuffer(pigeonOBJ.vertices, gl.ARRAY_BUFFER);
-    const pigeon_normalsBuffer = utils.createFloatBuffer(pigeonOBJ.normals, gl.ARRAY_BUFFER);
-    const pigeon_uvsBuffer = utils.createFloatBuffer(pigeonOBJ.uvs, gl.ARRAY_BUFFER);
-    const pigeon_indicesBuffer = utils.createUint16Buffer(pigeonOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
+    const rock_verticesBuffer = utils.createFloatBuffer(rockOBJ.vertices, gl.ARRAY_BUFFER);
+    const rock_normalsBuffer = utils.createFloatBuffer(rockOBJ.normals, gl.ARRAY_BUFFER);
+    const rock_uvsBuffer = utils.createFloatBuffer(rockOBJ.uvs, gl.ARRAY_BUFFER);
+    const rock_indicesBuffer = utils.createUint16Buffer(rockOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
 
     function render() {
         input();
@@ -191,37 +205,21 @@ function task() {
         mat4.perspective(viewProjection, 45, 1200.0 / 800.0, 0.1, 100.0);
 
         
-        drawObject(shader, [0.0, 2.0, -6.0], viewProjection, {
-            elementsCount: cubeOBJ.indices.length,
-            verticesBuffer: cube_verticesBuffer,
-            normalsBuffer: cube_normalsBuffer,
-            uvsBuffer: cube_uvsBuffer,
-            indicesBuffer: cube_indicesBuffer
-        }, 1.0, texture1);
+        drawObject(bumpShader, [-2.5, 0.0, -6.0], viewProjection, {
+            elementsCount: sphereOBJ.indices.length,
+            verticesBuffer: sphere_verticesBuffer,
+            normalsBuffer: sphere_normalsBuffer,
+            uvsBuffer: sphere_uvsBuffer,
+            indicesBuffer: sphere_indicesBuffer
+        }, 2, orangeTexture, orangeHeightmapTexture);
 
-        drawObject(shader, [-1.5, -1.0, -6.0], viewProjection, {
-            elementsCount: cubeOBJ.indices.length,
-            verticesBuffer: cube_verticesBuffer,
-            normalsBuffer: cube_normalsBuffer,
-            uvsBuffer: cube_uvsBuffer,
-            indicesBuffer: cube_indicesBuffer
-        }, 1.0, texture2);
-
-        drawObject(shader, [1.5, -1.0, -6.0], viewProjection, {
-            elementsCount: cubeOBJ.indices.length,
-            verticesBuffer: cube_verticesBuffer,
-            normalsBuffer: cube_normalsBuffer,
-            uvsBuffer: cube_uvsBuffer,
-            indicesBuffer: cube_indicesBuffer
-        }, 1.0, texture3);
-
-        drawObject(shader, [4.0, -1.0, -6.0], viewProjection, {
-            elementsCount: pigeonOBJ.indices.length,
-            verticesBuffer: pigeon_verticesBuffer,
-            normalsBuffer: pigeon_normalsBuffer,
-            uvsBuffer: pigeon_uvsBuffer,
-            indicesBuffer: pigeon_indicesBuffer
-        }, 2.0, texturePigeon);
+        drawObject(normalShader, [2.5, -1.0, -6.0], viewProjection, {
+            elementsCount: rockOBJ.indices.length,
+            verticesBuffer: rock_verticesBuffer,
+            normalsBuffer: rock_normalsBuffer,
+            uvsBuffer: rock_uvsBuffer,
+            indicesBuffer: rock_indicesBuffer
+        }, 4.0, rockTexture, rockNormalmapTexture);
 
         requestAnimationFrame(render);
     }
@@ -250,6 +248,7 @@ loadOBJs().then(result => {
     cubeOBJ = utils.loadObj(result.cube);
     sphereOBJ = utils.loadObj(result.sphere);
     pigeonOBJ = utils.loadObj(result.pigeon);
+    rockOBJ = utils.loadObj(result.rock);
     //console.log(result.snowman);
     main();
 });

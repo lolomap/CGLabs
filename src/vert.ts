@@ -98,7 +98,7 @@ void main() {
 }
 `
 
-export const shaderPhongTextured = `#version 300 es
+export const shaderPhongBumping = `#version 300 es
 uniform mat4 viewProjection;
 uniform mat4 model;
 
@@ -114,7 +114,11 @@ void main() {
     vec4 worldPos = model * vec4(inPosition, 1.0);
     gl_Position = viewProjection * worldPos;
     vPosition = worldPos.xyz;
-    vNormal = normalize( transpose( inverse( mat3( model ) ) ) * inNormal ); // NormalMatrix = (ModelLinear^-1)T
+
+    // NormalMatrix = (ModelLinear^-1)T
+    mat3 normalMatrix = transpose( inverse( mat3( model ) ) );
+
+    vNormal = normalize(normalMatrix * inNormal);
     vUV = inUV;
 }
 `
