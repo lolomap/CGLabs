@@ -1,6 +1,8 @@
 import { Particle } from "./particle";
 
 export class Spark implements Particle {
+    scale: number = 1;
+    alpha: number = 1;
     radius: number;
     speedFactor: number;
 
@@ -32,7 +34,7 @@ export class Spark implements Particle {
         this.y = (this.velocityY * 1000) % this.yMax;
     }
 
-    move(time: number) {
+    move(time: number, deltaTime: number) {
         let elapsed = time - this.timeFromCreation;
         this.timeFromCreation = time;
 

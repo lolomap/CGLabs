@@ -4,8 +4,11 @@ import * as utils from './utils'
 import {mat4, ReadonlyVec3} from 'gl-matrix'
 import { Emitter } from './emitter'
 import { Spark } from './spark';
+import { Smoke } from './smoke'
 
 const taskId = document.title;
+
+let lastTime = 0;
 
 let rotationX = 0.0;
 let rotationY = 0.0;
@@ -22,34 +25,27 @@ const sparkleImageTexture = document.getElementById("sparkle");
 let sparkleTexture = gl.createTexture(); waitLoadTexture(sparkleImageTexture, sparkleTexture);
 sparkleImageTexture.onload = () => utils.handleTextureLoaded(sparkleImageTexture, sparkleTexture);
 
+const smokeImageTexture = document.getElementById("smoke");
+let smokeTexture = gl.createTexture(); waitLoadTexture(smokeImageTexture, smokeTexture);
+smokeImageTexture.onload = () => utils.handleTextureLoaded(smokeImageTexture, smokeTexture);
+
 function drawPoints(
     vertexPosLoc: number,
     vertexColorLoc: number,
+    vertexScaleLoc: number,
     vertices: WebGLBuffer,
-    count: number
+    count: number,
+    mode: GLenum
 ) {
     gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
-    gl.vertexAttribPointer(vertexPosLoc, 3, gl.FLOAT, false, 24, 0);
-    gl.vertexAttribPointer(vertexColorLoc, 3, gl.FLOAT, false, 24, 12);
+    gl.vertexAttribPointer(vertexPosLoc, 3, gl.FLOAT, false, 32, 0);
+    gl.vertexAttribPointer(vertexColorLoc, 4, gl.FLOAT, false, 32, 12);
+    gl.vertexAttribPointer(vertexScaleLoc, 1, gl.FLOAT, false, 32, 28);
     gl.enableVertexAttribArray(vertexPosLoc);
     gl.enableVertexAttribArray(vertexColorLoc);
+    gl.enableVertexAttribArray(vertexScaleLoc);
 
-    gl.drawArrays(gl.POINTS, 0, count);
-}
-
-function drawLines(
-    vertexPosLoc: number,
-    vertexColorLoc: number,
-    vertices: WebGLBuffer,
-    count: number
-) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
-    gl.vertexAttribPointer(vertexPosLoc, 3, gl.FLOAT, false, 24, 0);
-    gl.vertexAttribPointer(vertexColorLoc, 3, gl.FLOAT, false, 24, 12);
-    gl.enableVertexAttribArray(vertexPosLoc);
-    gl.enableVertexAttribArray(vertexColorLoc);
-
-    gl.drawArrays(gl.LINES, 0, count);
+    gl.drawArrays(mode, 0, count);
 }
 
 function drawParticles(
@@ -65,6 +61,7 @@ function drawParticles(
 
     let vertexPosLoc = gl.getAttribLocation(shader, "inPosition");
     let vertexColorLoc = gl.getAttribLocation(shader, 'inColor');
+    let vertexScaleLoc = gl.getAttribLocation(shader, 'inScale');
 
     let viewProjectionLoc = gl.getUniformLocation(shader, "viewProjection");
     let modelLoc = gl.getUniformLocation(shader, "model");
@@ -85,10 +82,10 @@ function drawParticles(
 
     switch (mode) {
         case gl.POINTS:
-            drawPoints(vertexPosLoc, vertexColorLoc, vertices, count);
+            drawPoints(vertexPosLoc, vertexColorLoc, vertexScaleLoc, vertices, count, gl.POINTS);
             break;
         case gl.LINES:
-            drawLines(vertexPosLoc, vertexColorLoc, vertices, count);
+            drawPoints(vertexPosLoc, vertexColorLoc, vertexScaleLoc, vertices, count, gl.LINES);
             break;
     }
 }
@@ -117,10 +114,13 @@ function sparkler() {
     
     const sparkler_verticesBuffer = gl.createBuffer();
     const sparklerEmitter = new Emitter(Spark);
-    sparklerEmitter.spawn(10);
+    sparklerEmitter.spawn(10, 5, 10, 125, 256);
 
     function render() {
         input();
+        let time = performance.now();
+        let deltaTime = (time - lastTime) / 1000;
+        lastTime = time;
 
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.clearDepth(1.0);
@@ -129,7 +129,7 @@ function sparkler() {
         let viewProjection = mat4.create();
         mat4.perspective(viewProjection, 45, 1200.0 / 800.0, 0.1, 100.0);
 
-        sparklerEmitter.process(performance.now());
+        sparklerEmitter.process(time, deltaTime);
         sparklerEmitter.apply(sparkler_verticesBuffer);
         drawParticles(sparklerShader, [0.0, 0.0, -30.0], sparkler_verticesBuffer, sparklerEmitter.particles.length,
             viewProjection, sparkleTexture, gl.POINTS);
@@ -137,14 +137,47 @@ function sparkler() {
         const trailsVertices = [];
         sparklerEmitter.particles.forEach(particle => {
             trailsVertices.push(0, 0, 0); //start pos
-            trailsVertices.push(1, 1, 1); //start color
+            trailsVertices.push(1, 1, 1, 1); //start color
+            trailsVertices.push(1);
 
             trailsVertices.push(particle.x, particle.y, 0); //end pos
-            trailsVertices.push(0.47, 0.31, 0.24) //end color
+            trailsVertices.push(0.47, 0.31, 0.24, 1) //end color
+            trailsVertices.push(1);
         })
         const spartklerTrails_verticesBuffer = utils.createFloatBuffer(new Float32Array(trailsVertices), gl.ARRAY_BUFFER);
         drawParticles(sparklerTrailShader, [0.0, 0.0, -30.0], spartklerTrails_verticesBuffer,
             sparklerEmitter.particles.length * 2, viewProjection, undefined, gl.LINES);
+
+        requestAnimationFrame(render);
+    }
+    render();
+}
+
+function smoke() {
+    const smokeShader = utils.initShaderProgram(vertex.shaderSmoke, frag.shaderSmoke);
+    const sparklerTrailShader = utils.initShaderProgram(vertex.shaderSparklerTrail, frag.shaderSparklerTrail);
+
+    const smoke_verticesBuffer = gl.createBuffer();
+    const smokeEmitter = new Emitter(Smoke);
+    smokeEmitter.spawn(100, 2000, 4000, 1, 2);
+
+     function render() {
+        input();
+        let time = performance.now();
+        let deltaTime = (time - lastTime) / 1000;
+        lastTime = time;
+
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clearDepth(1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        let viewProjection = mat4.create();
+        mat4.perspective(viewProjection, 45, 1200.0 / 800.0, 0.1, 100.0);
+
+        smokeEmitter.process(time, deltaTime);
+        smokeEmitter.apply(smoke_verticesBuffer);
+        drawParticles(smokeShader, [0.0, 0.0, -30.0], smoke_verticesBuffer, smokeEmitter.particles.length,
+            viewProjection, smokeTexture, gl.POINTS);
 
         requestAnimationFrame(render);
     }
@@ -160,6 +193,9 @@ function main() {
     switch (taskId) {
         case 'Sparkler':
             sparkler();
+            break;
+        case 'Smoke':
+            smoke();
             break;
     }
 }

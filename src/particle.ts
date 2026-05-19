@@ -1,6 +1,8 @@
 export interface Particle {
     x: number; y: number;
+    alpha: number;
+    scale: number;
 
-    init(radius: number, speedFactor: number) : void;
-    move(time: number) : void;
+    init(limit: number, speed: number) : void;
+    move(time: number, deltaTime: number) : void;
 }
