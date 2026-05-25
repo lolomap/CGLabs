@@ -1,5 +1,3 @@
-import { Vector2 } from "./utils";
-
 
 export interface Particle {
     x: number; y: number;
@@ -20,8 +18,8 @@ export function PlaceCircleArea(particle: Particle, radius: number) {
     particle.y = r * Math.sin(angle);
 }
 
-export function PlaceLineArea(particle: Particle, start: Vector2, end: Vector2) {
+export function PlaceLineArea(particle: Particle, startX: number, startY: number, endX: number, endY: number) {
     const t = Math.random();
-    particle.x = start.x + t * (end.x - start.x);
-    particle.y = start.y + t * (end.y - start.y);
+    particle.x = startX + t * (endX - startX);
+    particle.y = startY + t * (endY - startY);
 }

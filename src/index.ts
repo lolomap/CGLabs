@@ -6,8 +6,8 @@ import { Emitter } from './emitter'
 import { Spark } from './spark';
 import { Smoke } from './smoke'
 import { Particle, PlaceCircleArea, PlaceLineArea } from './particle'
-import { Vector2 } from './utils'
 import { Snow } from './snow'
+import { getGravInPos, GravityParticle } from './gravitated'
 
 const taskId = document.title;
 
@@ -192,7 +192,7 @@ function snow() {
     const snow_verticesBuffer = gl.createBuffer();
     const snowEmitter = new Emitter(Snow);
     snowEmitter.spawn(3000, 3500, 6000, 3, 5, (particle: Particle) => {
-        PlaceLineArea(particle, new Vector2(-50, 20), new Vector2(50, 20));
+        PlaceLineArea(particle, -50, 20, 50, 20);
     });
 
      function render() {
@@ -211,6 +211,52 @@ function snow() {
         snowEmitter.process(time, deltaTime);
         snowEmitter.apply(snow_verticesBuffer);
         drawParticles(snowShader, [0.0, 0.0, -30.0], snow_verticesBuffer, snowEmitter.particles.length,
+            viewProjection, snowTexture, gl.POINTS);
+
+        requestAnimationFrame(render);
+    }
+    render();
+}
+
+function gravity() {
+    const gravityShader = utils.initShaderProgram(vertex.shaderSmoke, frag.shaderSmoke);
+
+    const gravity_verticesBuffer = gl.createBuffer();
+    const gravityEmitter = new Emitter(GravityParticle);
+    gravityEmitter.spawn(3000, 10000, 10000, 4, 5, (particle: Particle) => {
+        PlaceLineArea(particle, -25, 20, -25, -20);
+    });
+
+    const masses = [
+        {x: -10, y: 0, mass: 10, radius: 3},
+        {x: 5, y: 0, mass: 2, radius: 5},
+    ];
+
+     function render() {
+        input();
+        let time = performance.now();
+        let deltaTime = (time - lastTime) / 1000;
+        lastTime = time;
+
+        gl.clearColor(0.25, 0.25, 0.5, 1.0);
+        gl.clearDepth(1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        let viewProjection = mat4.create();
+        mat4.perspective(viewProjection, 45, 1200.0 / 800.0, 0.1, 100.0);
+
+        gravityEmitter.particles.forEach(particle => {
+            ({gx: particle.gravityX, gy: particle.gravityY} = getGravInPos(particle.x, particle.y, masses));
+        });
+
+        gravityEmitter.process(time, deltaTime);
+
+        gravityEmitter.particles.forEach(particle => {
+            particle.resolveCollisions(masses);
+        });
+
+        gravityEmitter.apply(gravity_verticesBuffer);
+        drawParticles(gravityShader, [0.0, 0.0, -30.0], gravity_verticesBuffer, gravityEmitter.particles.length,
             viewProjection, snowTexture, gl.POINTS);
 
         requestAnimationFrame(render);
@@ -238,6 +284,10 @@ function main() {
         case 'Snow':
             createTexture(snowTexture, "snow");
             snow();
+            break;
+        case 'Gravity':
+            createTexture(sparkleTexture, "sparkle");
+            gravity();
             break;
     }
 }
