@@ -6,11 +6,20 @@ export class Emitter<TParticle extends Particle> {
 
     constructor(private ParticleClass: new () => TParticle) {}
 
-    spawn(count: number, minLimit: number, maxLimit: number, minSpeed: number, maxSpeed: number) {
+    spawn(
+        count: number,
+        minLimit: number,
+        maxLimit: number,
+        minSpeed: number,
+        maxSpeed: number,
+        placer?: (particle: Particle) => void
+    ) {
         for (let i = 0; i < count; i++) {
-            const particle: TParticle = new this.ParticleClass()
+            const particle: TParticle = new this.ParticleClass();
+            if (placer)
+                particle.placer = () => {placer(particle);};
             particle.init(minLimit + Math.random() * (maxLimit - minLimit), minSpeed + Math.random() * (maxSpeed - minSpeed));
-            this.particles.push(particle)
+            this.particles.push(particle);
         }
     }
 
@@ -21,6 +30,8 @@ export class Emitter<TParticle extends Particle> {
     }
 
     apply(vertices: WebGLBuffer) {
+        this.particles.sort((a, b) => b.alpha - a.alpha);
+
         let verticesData = [];
 
         this.particles.forEach(particle => {
@@ -28,7 +39,7 @@ export class Emitter<TParticle extends Particle> {
             verticesData.push(particle.x, particle.y, 0);
 
             //Color
-            verticesData.push(1, 1, 1, particle.alpha);
+            verticesData.push(0.25, 0.25, 0.25, particle.alpha);
 
             verticesData.push(particle.scale);
         })

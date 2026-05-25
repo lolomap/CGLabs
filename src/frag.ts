@@ -37,7 +37,7 @@ out vec4 outColor;
 
 void main() {
     vec4 texColor = texture(sampler, gl_PointCoord);
-    outColor = vec4(texColor.rgb, texColor.a * vColor.a);
+    outColor = texColor * vColor;
 }
 
 `

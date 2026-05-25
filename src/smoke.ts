@@ -5,6 +5,8 @@ export class Smoke implements Particle {
     y: number;
     alpha: number;
     scale: number;
+    
+    placer = () => {this.x = 0; this.y = 0;};
 
     lifetime: number;
     velocityX: number; velocityY: number;
@@ -12,17 +14,20 @@ export class Smoke implements Particle {
     maxLifetimeDelta: number;
     scaleSpeed: number;
     speed: number;
+    friction: number;
 
     timeFromCreation: number;
+    baseLifetime: number;
 
     init(lifetime: number, speed: number): void {
-        this.reset(lifetime, speed);
+        this.baseLifetime = lifetime;
+        this.reset(speed);
     }
 
     move(time: number, deltaTime: number): void {
         let elapsed = time - this.timeFromCreation;
         if (elapsed >= this.lifetime) {
-            this.reset(this.lifetime, this.speed);
+            this.reset(this.speed);
             return;
         }
 
@@ -33,19 +38,23 @@ export class Smoke implements Particle {
         this.x += this.velocityX * this.speed * deltaTime;
         this.y += this.velocityY * this.speed * deltaTime;
 
+        const damping = Math.exp(-this.friction * deltaTime);
+        this.velocityX *= damping;
+        this.velocityY *= damping;
+
         this.alpha = 1 - elapsed / this.lifetime;
         this.scale += this.scaleSpeed * deltaTime;
     }
 
-    reset(lifetime: number, speed: number): void {
-        this.x = 0;
-        this.y = 0;
+    reset(speed: number): void {
+        this.placer();
 
         this.maxVelocityDelta = 0.250;
         this.maxLifetimeDelta = 2000; // +- 1 sec
         this.scaleSpeed = 1;
+        this.friction = 1.2;
 
-        this.lifetime = lifetime + (Math.random() * this.maxLifetimeDelta - this.maxLifetimeDelta / 2);
+        this.lifetime = this.baseLifetime + (Math.random() * this.maxLifetimeDelta - this.maxLifetimeDelta / 2);
         this.speed = speed;
         
         this.timeFromCreation = performance.now();

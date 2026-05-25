@@ -171,6 +171,7 @@ export function handleTexturePlaceholder(texture) {
 export function handleTextureLoaded(image, texture) {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); 
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     // указывает далее идущему методу gl.texImage2D(), как текстура должна позиционироваться. Так, в данном случае мы 
     // передаем в качестве параметра значение gl.UNPACK_FLIP_Y_WEBGL - этот параметр указывает методу gl.texImage2D(),
     // что изображение надо перевернуть относительно горизонтальной оси.

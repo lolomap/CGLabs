@@ -14,6 +14,11 @@ export class Spark implements Particle {
     velocityX: number; velocityY: number;
     x: number; y: number;
 
+    placer = () => {
+        this.x = (this.velocityX * 1000) % this.xMax;
+        this.y = (this.velocityY * 1000) % this.yMax;
+    };
+
     init(radius: number, speedFactor: number) {
         this.reset(radius, speedFactor);
     }
@@ -30,8 +35,7 @@ export class Spark implements Particle {
         this.velocityX = this.xMax / speedFactor;
         this.velocityY = this.yMax / speedFactor;
 
-        this.x = (this.velocityX * 1000) % this.xMax;
-        this.y = (this.velocityY * 1000) % this.yMax;
+        this.placer();
     }
 
     move(time: number, deltaTime: number) {

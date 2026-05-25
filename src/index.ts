@@ -5,6 +5,7 @@ import {mat4, ReadonlyVec3} from 'gl-matrix'
 import { Emitter } from './emitter'
 import { Spark } from './spark';
 import { Smoke } from './smoke'
+import { Particle, PlaceCircleArea } from './particle'
 
 const taskId = document.title;
 
@@ -159,7 +160,9 @@ function smoke() {
 
     const smoke_verticesBuffer = gl.createBuffer();
     const smokeEmitter = new Emitter(Smoke);
-    smokeEmitter.spawn(100, 2000, 4000, 1, 2);
+    smokeEmitter.spawn(500, 3500, 6000, 1, 2, (particle: Particle) => {
+        PlaceCircleArea(particle, 5);
+    });
 
      function render() {
         input();
@@ -192,9 +195,12 @@ function main() {
 
     switch (taskId) {
         case 'Sparkler':
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
             sparkler();
             break;
         case 'Smoke':
+            gl.depthMask(false);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
             smoke();
             break;
     }
