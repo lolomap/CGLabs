@@ -8,16 +8,12 @@ import { Smoke } from './smoke'
 import { Particle, PlaceCircleArea, PlaceLineArea } from './particle'
 import { Snow } from './snow'
 import { getGravInPos, GravityParticle } from './gravitated'
+import { QuadParticle } from './quad-sparkle'
 
 const taskId = document.title;
 
 let lastTime = 0;
 
-let rotationX = 0.0;
-let rotationY = 0.0;
-let scale = 0.75;
-let moveX = 0.0; 
-const speed = 1.0;
 
 let keyPressed: string;
 
@@ -49,6 +45,22 @@ function drawPoints(
     gl.drawArrays(mode, 0, count);
 }
 
+function drawQuads(
+    vertexPosLoc: number,
+    vertexUVLoc: number,
+    vertices: WebGLBuffer,
+    count: number,
+    mode: GLenum
+) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
+    gl.vertexAttribPointer(vertexPosLoc, 3, gl.FLOAT, false, 20, 0);
+    gl.vertexAttribPointer(vertexUVLoc, 2, gl.FLOAT, false, 20, 12);
+    gl.enableVertexAttribArray(vertexPosLoc);
+    gl.enableVertexAttribArray(vertexUVLoc);
+
+    gl.drawArrays(mode, 0, count * 6);
+}
+
 function drawParticles(
     shader: WebGLShader,
     pos: ReadonlyVec3,
@@ -63,6 +75,7 @@ function drawParticles(
     let vertexPosLoc = gl.getAttribLocation(shader, "inPosition");
     let vertexColorLoc = gl.getAttribLocation(shader, 'inColor');
     let vertexScaleLoc = gl.getAttribLocation(shader, 'inScale');
+    let vertexUVLoc = gl.getAttribLocation(shader, 'inUV');
 
     let viewProjectionLoc = gl.getUniformLocation(shader, "viewProjection");
     let modelLoc = gl.getUniformLocation(shader, "model");
@@ -76,37 +89,23 @@ function drawParticles(
     }
 
     let model = mat4.create();
-    mat4.translate(model, model, [pos[0] + moveX, pos[1], pos[2]]);
-    mat4.rotate(model, model, rotationY * (Math.PI / 180), [1.0, 0.0, 0.0]);
-    mat4.rotate(model, model, (rotationX) * (Math.PI / 180), [0.0, 1.0, 0.0]);
+    mat4.translate(model, model, [pos[0], pos[1], pos[2]]);
+    //mat4.rotate(model, model, rotationY * (Math.PI / 180), [1.0, 0.0, 0.0]);
+    //mat4.rotate(model, model, (rotationX) * (Math.PI / 180), [0.0, 1.0, 0.0]);
     gl.uniformMatrix4fv(modelLoc, false, model as Float32Array);
 
     switch (mode) {
         case gl.POINTS:
-            drawPoints(vertexPosLoc, vertexColorLoc, vertexScaleLoc, vertices, count, gl.POINTS);
-            break;
         case gl.LINES:
-            drawPoints(vertexPosLoc, vertexColorLoc, vertexScaleLoc, vertices, count, gl.LINES);
+            drawPoints(vertexPosLoc, vertexColorLoc, vertexScaleLoc, vertices, count, mode);
             break;
+        case gl.TRIANGLES:
+            drawQuads(vertexPosLoc, vertexUVLoc, vertices, count, mode);
     }
 }
 
-const inputHandlers = {
-    'ArrowLeft': () => {rotationX += speed},
-    'ArrowRight': () => {rotationX -= speed},
-    'ArrowUp': () => {rotationY += speed},
-    'ArrowDown': () => {rotationY -= speed},
-    'Q': () => {scale -= speed * 0.01},
-    'E': () => {scale += speed * 0.01},
-    'q': () => {moveX -= speed * 0.1},
-    'e': () => {moveX += speed * 0.1},
-};
 
 function input() {
-    if (!keyPressed) return;
-    let handler = inputHandlers[keyPressed];
-    if (handler)
-        handler();
 }
 
 function sparkler() {
@@ -264,6 +263,36 @@ function gravity() {
     render();
 }
 
+function sparklerQuad() {
+    const sparklerShader = utils.initShaderProgram(vertex.shaderQuad, frag.shaderQuad);
+    
+    const sparkler_verticesBuffer = gl.createBuffer();
+    const sparklerEmitter = new Emitter(QuadParticle);
+    sparklerEmitter.spawn(10, 3500, 6000, 1, 2);
+
+    function render() {
+        input();
+        let time = performance.now();
+        let deltaTime = (time - lastTime) / 1000;
+        lastTime = time;
+
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clearDepth(1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        let viewProjection = mat4.create();
+        mat4.perspective(viewProjection, 45, 1200.0 / 800.0, 0.1, 100.0);
+
+        sparklerEmitter.process(time, deltaTime);
+        sparklerEmitter.applyQuad(sparkler_verticesBuffer, 0.5);
+        drawParticles(sparklerShader, [0.0, 0.0, -30.0], sparkler_verticesBuffer, sparklerEmitter.particles.length,
+            viewProjection, sparkleTexture, gl.TRIANGLES);
+
+        requestAnimationFrame(render);
+    }
+    render();
+}
+
 function main() {
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -288,6 +317,10 @@ function main() {
         case 'Gravity':
             createTexture(sparkleTexture, "sparkle");
             gravity();
+            break;
+        case 'Sparkler Quad':
+            createTexture(sparkleTexture, "sparkle");
+            sparklerQuad();
             break;
     }
 }

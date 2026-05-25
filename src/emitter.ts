@@ -47,4 +47,29 @@ export class Emitter<TParticle extends Particle> {
         gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verticesData), gl.STATIC_DRAW);
     }
+
+    applyQuad(vertices: WebGLBuffer, baseHalfSize: number) {
+        this.particles.sort((a, b) => b.alpha - a.alpha);
+
+        let verticesData = [];
+
+        this.particles.forEach(particle => {
+            verticesData.push(particle.x - baseHalfSize, particle.y - baseHalfSize, 0);
+            verticesData.push(0, 0);
+            verticesData.push(particle.x + baseHalfSize, particle.y - baseHalfSize, 0);
+            verticesData.push(1, 0);
+            verticesData.push(particle.x + baseHalfSize, particle.y + baseHalfSize, 0);
+            verticesData.push(1, 1);
+
+            verticesData.push(particle.x + baseHalfSize, particle.y + baseHalfSize, 0);
+            verticesData.push(1, 1);
+            verticesData.push(particle.x - baseHalfSize, particle.y + baseHalfSize, 0);
+            verticesData.push(0, 1);
+            verticesData.push(particle.x - baseHalfSize, particle.y - baseHalfSize, 0);
+            verticesData.push(0, 0);
+        })
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verticesData), gl.STATIC_DRAW);
+    }
 }

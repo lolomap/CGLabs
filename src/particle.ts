@@ -3,7 +3,7 @@ export interface Particle {
     x: number; y: number;
     alpha: number;
     scale: number;
-
+    
     placer: () => void;
 
     init(limit: number, speed: number) : void;

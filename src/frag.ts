@@ -41,3 +41,19 @@ void main() {
 }
 
 `
+
+
+export const shaderQuad = `#version 300 es
+precision mediump float;
+
+uniform sampler2D sampler;
+
+in vec3 vPosition;
+in vec2 vUV;
+
+out vec4 outColor;
+
+void main() {
+    outColor = texture(sampler, vUV);
+}
+`
