@@ -5,7 +5,9 @@ import {mat4, ReadonlyVec3} from 'gl-matrix'
 import { Emitter } from './emitter'
 import { Spark } from './spark';
 import { Smoke } from './smoke'
-import { Particle, PlaceCircleArea } from './particle'
+import { Particle, PlaceCircleArea, PlaceLineArea } from './particle'
+import { Vector2 } from './utils'
+import { Snow } from './snow'
 
 const taskId = document.title;
 
@@ -22,13 +24,11 @@ let keyPressed: string;
 utils.setupGL();
 const gl = utils.gl;
 
-const sparkleImageTexture = document.getElementById("sparkle");
-let sparkleTexture = gl.createTexture(); waitLoadTexture(sparkleImageTexture, sparkleTexture);
-sparkleImageTexture.onload = () => utils.handleTextureLoaded(sparkleImageTexture, sparkleTexture);
+let sparkleTexture: WebGLTexture,
+    smokeTexture: WebGLTexture,
+    snowTexture: WebGLTexture;
 
-const smokeImageTexture = document.getElementById("smoke");
-let smokeTexture = gl.createTexture(); waitLoadTexture(smokeImageTexture, smokeTexture);
-smokeImageTexture.onload = () => utils.handleTextureLoaded(smokeImageTexture, smokeTexture);
+
 
 function drawPoints(
     vertexPosLoc: number,
@@ -156,7 +156,6 @@ function sparkler() {
 
 function smoke() {
     const smokeShader = utils.initShaderProgram(vertex.shaderSmoke, frag.shaderSmoke);
-    const sparklerTrailShader = utils.initShaderProgram(vertex.shaderSparklerTrail, frag.shaderSparklerTrail);
 
     const smoke_verticesBuffer = gl.createBuffer();
     const smokeEmitter = new Emitter(Smoke);
@@ -187,6 +186,38 @@ function smoke() {
     render();
 }
 
+function snow() {
+    const snowShader = utils.initShaderProgram(vertex.shaderSmoke, frag.shaderSmoke);
+
+    const snow_verticesBuffer = gl.createBuffer();
+    const snowEmitter = new Emitter(Snow);
+    snowEmitter.spawn(3000, 3500, 6000, 3, 5, (particle: Particle) => {
+        PlaceLineArea(particle, new Vector2(-50, 20), new Vector2(50, 20));
+    });
+
+     function render() {
+        input();
+        let time = performance.now();
+        let deltaTime = (time - lastTime) / 1000;
+        lastTime = time;
+
+        gl.clearColor(0.25, 0.25, 0.5, 1.0);
+        gl.clearDepth(1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        let viewProjection = mat4.create();
+        mat4.perspective(viewProjection, 45, 1200.0 / 800.0, 0.1, 100.0);
+
+        snowEmitter.process(time, deltaTime);
+        snowEmitter.apply(snow_verticesBuffer);
+        drawParticles(snowShader, [0.0, 0.0, -30.0], snow_verticesBuffer, snowEmitter.particles.length,
+            viewProjection, snowTexture, gl.POINTS);
+
+        requestAnimationFrame(render);
+    }
+    render();
+}
+
 function main() {
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -195,13 +226,18 @@ function main() {
 
     switch (taskId) {
         case 'Sparkler':
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+            createTexture(sparkleTexture, "sparkle");
             sparkler();
             break;
         case 'Smoke':
-            gl.depthMask(false);
+            createTexture(smokeTexture, "smoke");
+            //gl.depthMask(false);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
             smoke();
+            break;
+        case 'Snow':
+            createTexture(snowTexture, "snow");
+            snow();
             break;
     }
 }
@@ -214,10 +250,16 @@ window.addEventListener('keyup', (event) => {
     keyPressed = undefined;
 })
 
+function createTexture(texture: WebGLTexture, id: string) {
+    const imageTexture = document.getElementById(id);
+    texture = gl.createTexture(); waitLoadTexture(imageTexture, texture);
+    imageTexture.onload = () => utils.handleTextureLoaded(imageTexture, texture);
+}
+
 function waitLoadTexture(image, texture) {
     if (image.complete) {
-    utils.handleTextureLoaded(image, texture);
-} else {
-    image.onload = () => utils.handleTextureLoaded(image, texture);
-}
+        utils.handleTextureLoaded(image, texture);
+    } else {
+        image.onload = () => utils.handleTextureLoaded(image, texture);
+    }
 }

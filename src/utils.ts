@@ -200,3 +200,13 @@ export function handleTextureLoaded(image, texture) {
 function isPowerOf2(x) {
     return (Math.log(x)/Math.log(2)) % 1 === 0;
 }
+
+export class Vector2 {
+    x: number;
+    y: number;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+}
