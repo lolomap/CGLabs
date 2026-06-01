@@ -1,10 +1,13 @@
 
 export interface Particle {
     x: number; y: number;
+    colorR?: number; colorG?: number; colorB?: number
     alpha: number;
     scale: number;
+    isDead?: boolean;
     
     placer: () => void;
+    callback?: () => boolean;
 
     init(limit: number, speed: number) : void;
     move(time: number, deltaTime: number) : void;

@@ -68,15 +68,18 @@ uniform mat4 viewProjection;
 uniform mat4 model;
 
 in vec3 inPosition;
+in vec4 inColor;
 in vec2 inUV;
 
 out vec3 vPosition;
 out vec2 vUV;
+out vec4 vColor;
 
 void main() {
     vec4 worldPos = model * vec4(inPosition, 1.0);
     gl_Position = viewProjection * worldPos;
     vPosition = worldPos.xyz;
     vUV = inUV;
+    vColor = inColor;
 }
 `

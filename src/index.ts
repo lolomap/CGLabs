@@ -47,15 +47,18 @@ function drawPoints(
 
 function drawQuads(
     vertexPosLoc: number,
+    vertexColorLoc: number,
     vertexUVLoc: number,
     vertices: WebGLBuffer,
     count: number,
     mode: GLenum
 ) {
     gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
-    gl.vertexAttribPointer(vertexPosLoc, 3, gl.FLOAT, false, 20, 0);
-    gl.vertexAttribPointer(vertexUVLoc, 2, gl.FLOAT, false, 20, 12);
+    gl.vertexAttribPointer(vertexPosLoc, 3, gl.FLOAT, false, 36, 0);
+    gl.vertexAttribPointer(vertexColorLoc, 4, gl.FLOAT, false, 36, 12);
+    gl.vertexAttribPointer(vertexUVLoc, 2, gl.FLOAT, false, 36, 28);
     gl.enableVertexAttribArray(vertexPosLoc);
+    gl.enableVertexAttribArray(vertexColorLoc);
     gl.enableVertexAttribArray(vertexUVLoc);
 
     gl.drawArrays(mode, 0, count * 6);
@@ -68,7 +71,8 @@ function drawParticles(
     count: number,
     viewProjection: mat4,
     texture: WebGLTexture,
-    mode: GLenum
+    mode: GLenum,
+    scale?: number
 ) {
     gl.useProgram(shader);
 
@@ -92,6 +96,9 @@ function drawParticles(
     mat4.translate(model, model, [pos[0], pos[1], pos[2]]);
     //mat4.rotate(model, model, rotationY * (Math.PI / 180), [1.0, 0.0, 0.0]);
     //mat4.rotate(model, model, (rotationX) * (Math.PI / 180), [0.0, 1.0, 0.0]);
+    if (mode == gl.TRIANGLES && scale) {
+        mat4.scale(model, model, [scale, scale, 0]);
+    }
     gl.uniformMatrix4fv(modelLoc, false, model as Float32Array);
 
     switch (mode) {
@@ -100,7 +107,7 @@ function drawParticles(
             drawPoints(vertexPosLoc, vertexColorLoc, vertexScaleLoc, vertices, count, mode);
             break;
         case gl.TRIANGLES:
-            drawQuads(vertexPosLoc, vertexUVLoc, vertices, count, mode);
+            drawQuads(vertexPosLoc, vertexColorLoc, vertexUVLoc, vertices, count, mode);
     }
 }
 
@@ -268,7 +275,36 @@ function sparklerQuad() {
     
     const sparkler_verticesBuffer = gl.createBuffer();
     const sparklerEmitter = new Emitter(QuadParticle);
-    sparklerEmitter.spawn(10, 3500, 6000, 1, 2);
+    let explosions = 10;
+
+    function createExplosion(x: number, y: number) {
+        sparklerEmitter.spawn(500, 1500, 1500, 5, 8,
+            (particle: Particle) => {particle.x = x; particle.y = y;}, //placer
+            (particle: Particle) => {
+                if (explosions > 0 && Math.random() < 0.05) {
+                    createExplosion(particle.x, particle.y);
+                    explosions--;
+                }
+                return true;
+            } //callback
+        );
+    }
+
+    function createRocket() {
+        const rocket = new QuadParticle();
+        rocket.placer = () => {rocket.x = 0; rocket.y = -15;};
+        rocket.callback = () => {createExplosion(rocket.x, rocket.y); return true;};
+        
+        rocket.init(3000, 5);
+        rocket.velocityX = 0;
+        rocket.velocityY = 1;
+        rocket.gravity = 0;
+        rocket.friction = 1;
+        rocket.alpha = 1;
+        rocket.scale = 1.5;
+        sparklerEmitter.particles.push(rocket);
+    }
+    createRocket();
 
     function render() {
         input();
@@ -286,7 +322,7 @@ function sparklerQuad() {
         sparklerEmitter.process(time, deltaTime);
         sparklerEmitter.applyQuad(sparkler_verticesBuffer, 0.5);
         drawParticles(sparklerShader, [0.0, 0.0, -30.0], sparkler_verticesBuffer, sparklerEmitter.particles.length,
-            viewProjection, sparkleTexture, gl.TRIANGLES);
+            viewProjection, sparkleTexture, gl.TRIANGLES, 2.0);
 
         requestAnimationFrame(render);
     }

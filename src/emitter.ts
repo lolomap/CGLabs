@@ -12,18 +12,23 @@ export class Emitter<TParticle extends Particle> {
         maxLimit: number,
         minSpeed: number,
         maxSpeed: number,
-        placer?: (particle: Particle) => void
+        placer?: (particle: Particle) => void,
+        callback?: (particle: Particle) => boolean
     ) {
         for (let i = 0; i < count; i++) {
             const particle: TParticle = new this.ParticleClass();
             if (placer)
                 particle.placer = () => {placer(particle);};
+            if (callback)
+                particle.callback = () => {return callback(particle)};
             particle.init(minLimit + Math.random() * (maxLimit - minLimit), minSpeed + Math.random() * (maxSpeed - minSpeed));
             this.particles.push(particle);
         }
     }
 
     process(time: number, deltaTime: number) {
+        this.particles = this.particles.filter(particle => !particle.isDead);
+
         this.particles.forEach(particle => {
             particle.move(time, deltaTime);
         });
@@ -55,18 +60,18 @@ export class Emitter<TParticle extends Particle> {
 
         this.particles.forEach(particle => {
             verticesData.push(particle.x - baseHalfSize, particle.y - baseHalfSize, 0);
-            verticesData.push(0, 0);
+            verticesData.push(particle.colorR, particle.colorG, particle.colorB, particle.alpha); verticesData.push(0, 0); 
             verticesData.push(particle.x + baseHalfSize, particle.y - baseHalfSize, 0);
-            verticesData.push(1, 0);
+            verticesData.push(particle.colorR, particle.colorG, particle.colorB, particle.alpha); verticesData.push(1, 0); 
             verticesData.push(particle.x + baseHalfSize, particle.y + baseHalfSize, 0);
-            verticesData.push(1, 1);
+            verticesData.push(particle.colorR, particle.colorG, particle.colorB, particle.alpha); verticesData.push(1, 1); 
 
             verticesData.push(particle.x + baseHalfSize, particle.y + baseHalfSize, 0);
-            verticesData.push(1, 1);
+            verticesData.push(particle.colorR, particle.colorG, particle.colorB, particle.alpha); verticesData.push(1, 1); 
             verticesData.push(particle.x - baseHalfSize, particle.y + baseHalfSize, 0);
-            verticesData.push(0, 1);
+            verticesData.push(particle.colorR, particle.colorG, particle.colorB, particle.alpha); verticesData.push(0, 1); 
             verticesData.push(particle.x - baseHalfSize, particle.y - baseHalfSize, 0);
-            verticesData.push(0, 0);
+            verticesData.push(particle.colorR, particle.colorG, particle.colorB, particle.alpha); verticesData.push(0, 0); 
         })
 
         gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
