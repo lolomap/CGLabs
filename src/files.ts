@@ -10,7 +10,7 @@ export async function readFile(path:string) {
 export async function loadOBJs() {
     return {
         cube: await readFile('cube.obj'),
-        sphere: await readFile('sphere.obj'),
+        sphere: await readFile('sphere3.obj'),
 
         pigeon: await readFile('pigeon.obj'),
         snowman: await readFile('snowman.obj'),
