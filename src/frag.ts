@@ -162,8 +162,8 @@ void main() {
         attenuation * diffuseI * lightColor * diff +
         attenuation * specularI * lightColor * pow(specular, lightIntensivity);
 
-    vec4 textureColor = texture(sampler, vUV);
-    vec4 color = tint * textureColor;
+    //vec4 textureColor = texture(sampler, vUV);
+    vec4 color = tint;// * textureColor;
     
     outColor = vec4(lightWeighting.rgb * color.rgb, 1.0);
 }
@@ -234,8 +234,8 @@ void main() {
         attenuation * diffuseI * lightColor * diff +
         attenuation * specularI * lightColor * pow(specular, lightIntensivity);
 
-    vec4 textureColor = texture(sampler, vUV);
-    vec4 color = tint * textureColor;
+    //vec4 textureColor = texture(sampler, vUV);
+    vec4 color = tint;// * textureColor;
     
     outColor = vec4(lightWeighting.rgb * color.rgb, 1.0);
 }
