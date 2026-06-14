@@ -184,15 +184,15 @@ export function handleTextureLoaded(image, texture) {
     if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
     // Размер соответствует степени 2. Создаем MIP'ы.
         gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     } else {
     // Размер не соответствует степени 2.
     // Отключаем MIP’ы и повторение и устанавливаем натяжение по краям
     // также разрешено gl.NEAREST вместо gl.LINEAR, но не mipmap.
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    // Не допускаем повторения по s-координате.
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    // Не допускаем повторения по t-координате.
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     }
 }
 

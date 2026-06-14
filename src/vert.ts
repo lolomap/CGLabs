@@ -101,6 +101,7 @@ void main() {
 export const shaderPhongBumping = `#version 300 es
 uniform mat4 viewProjection;
 uniform mat4 model;
+uniform float repeatScale;
 
 in vec3 inPosition;
 in vec3 inNormal;
@@ -119,6 +120,6 @@ void main() {
     mat3 normalMatrix = transpose( inverse( mat3( model ) ) );
 
     vNormal = normalize(normalMatrix * inNormal);
-    vUV = inUV;
+    vUV = inUV * repeatScale;
 }
 `

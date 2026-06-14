@@ -1,21 +1,17 @@
 import * as vertex from './vert'
 import * as frag from './frag'
 import * as utils from './utils'
-import {mat4, ReadonlyVec3} from 'gl-matrix'
+import {mat4, vec3, ReadonlyVec3, IndexedCollection} from 'gl-matrix'
 import { loadOBJs } from './files';
 
 const taskId = document.title;
 
-let rotationX = 0.0;
-let rotationY = 0.0;
-let scale = 0.75;
-let moveX = 0.0; 
 let lightIntensivity = 5.0;
 let lightLinear = 0.09;
 let lightQuadratic = 0.032;
-let ambient = 0;
+let ambient = 0.5;
 let diff = 1;
-let specular = 0.5;
+let specular = 0.15;
 let tint = -1;
 let textureMix = 0.5;
 let bumpScale = 1;
@@ -23,29 +19,27 @@ const speed = 1.0;
 
 let keyPressed: string;
 
+let cameraPos: vec3 = [0.0, 0.0, 5.0];
+let cameraYaw = -90.0;
+let cameraPitch = 0.0;
+let cameraFront: vec3 = [0.0, 0.0, -1.0];
+let cameraUp: vec3 = [0.0, 1.0, 0.0];
+let cameraSpeed = 0.1;
+
 utils.setupGL();
 const gl = utils.gl;
 
 let cubeOBJ: utils.OBJ;
 let sphereOBJ: utils.OBJ;
-let pigeonOBJ: utils.OBJ;
-let rockOBJ: utils.OBJ;
+let humanOBJ: utils.OBJ;
 
-const orangeImageTexture = document.getElementById("orange");
-let orangeTexture = gl.createTexture(); waitLoadTexture(orangeImageTexture, orangeTexture);
-orangeImageTexture.onload = () => utils.handleTextureLoaded(orangeImageTexture, orangeTexture);
+// const emptyNormalImageTexture = document.getElementById("empty_normal");
+// let emptyNormalTexture = gl.createTexture(); waitLoadTexture(emptyNormalImageTexture, emptyNormalTexture);
+// emptyNormalImageTexture.onload = () => utils.handleTextureLoaded(emptyNormalImageTexture, emptyNormalTexture);
 
-const orangeHeightmapImageTexture = document.getElementById("orange-heightmap");
-let orangeHeightmapTexture = gl.createTexture(); waitLoadTexture(orangeHeightmapImageTexture, orangeHeightmapTexture);
-orangeHeightmapImageTexture.onload = () => utils.handleTextureLoaded(orangeHeightmapImageTexture, orangeHeightmapTexture);
+const emptyNormalTexture = loadTexture("empty_normal");
+const woodTexture = loadTexture("wood");
 
-const rockImageTexture = document.getElementById("rock");
-let rockTexture = gl.createTexture(); waitLoadTexture(rockImageTexture, rockTexture);
-rockImageTexture.onload = () => utils.handleTextureLoaded(rockImageTexture, rockTexture);
-
-const rockNormalmapImageTexture = document.getElementById("rock-normalmap");
-let rockNormalmapTexture = gl.createTexture(); waitLoadTexture(rockNormalmapImageTexture, rockNormalmapTexture);
-rockNormalmapImageTexture.onload = () => utils.handleTextureLoaded(rockNormalmapImageTexture, rockNormalmapTexture);
 
 function drawModel(
     vertexPosLoc: number,
@@ -74,9 +68,10 @@ function drawObject(
     pos: ReadonlyVec3,
     viewProjection: mat4,
     renderObj: utils.RenderObj,
-    scaleModifier,
+    scaleModifier: IndexedCollection,
     texture: WebGLTexture,
-    map: WebGLTexture
+    map: WebGLTexture,
+    textureRepeat: number
 ) {
     gl.useProgram(shader);
 
@@ -106,63 +101,67 @@ function drawObject(
     gl.uniform1f(diffuseLoc, diff);
     gl.uniform1f(specularLoc, specular);
 
-    let samplerLoc = gl.getUniformLocation(shader, 'sampler');
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.uniform1i(samplerLoc, 0);
-    
-    //let sampler2Loc = gl.getUniformLocation(shader, 'sampler2');
-    //gl.activeTexture(gl.TEXTURE1);
-    //gl.bindTexture(gl.TEXTURE_2D, textureWood);
-    //gl.uniform1i(sampler2Loc, 1);
-
-    let mapLoc = gl.getUniformLocation(shader, 'map');
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, map);
-    gl.uniform1i(mapLoc, 1);
-
-    // let textureMixLoc = gl.getUniformLocation(shader, 'textureMix');
-    // gl.uniform1f(textureMixLoc, textureMix);
-
-    let bumpScaleLoc = gl.getUniformLocation(shader, 'bumpScale');
-    gl.uniform1f(bumpScaleLoc, bumpScale);
+    if (texture) {
+        let samplerLoc = gl.getUniformLocation(shader, 'sampler');
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(samplerLoc, 0);
+    }
+    if (map) {
+        let mapLoc = gl.getUniformLocation(shader, 'map');
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, map);
+        gl.uniform1i(mapLoc, 1);
+    }
     
     let tintLoc = gl.getUniformLocation(shader, 'tint');
-    let tintColor = [0.3, 0.3, 0.3, 1.0];
-    if (tint >= 0)
-        tintColor[tint] = 1.0;
-    else tintColor = [1.0, 0.5, 0.0, 1.0];
+    let tintColor = [1.0, 1.0, 1.0, 1.0];
     gl.uniform4fv(tintLoc, tintColor);
 
+    let repeatLoc = gl.getUniformLocation(shader, 'repeatScale');
+    gl.uniform1f(repeatLoc, textureRepeat);
 
     let model = mat4.create();
-    mat4.translate(model, model, [pos[0] + moveX, pos[1], pos[2]]);
-    mat4.rotate(model, model, rotationY * (Math.PI / 180), [1.0, 0.0, 0.0]);
-    mat4.rotate(model, model, (rotationX - 90) * (Math.PI / 180), [0.0, 1.0, 0.0]);
-    mat4.scale(model, model, [scale * scaleModifier, scale  * scaleModifier, scale  * scaleModifier]);
+    mat4.translate(model, model, [pos[0], pos[1], pos[2]]);
+    mat4.rotate(model, model, -90 * (Math.PI / 180), [0.0, 1.0, 0.0]);
+    mat4.scale(model, model, scaleModifier);
     gl.uniformMatrix4fv(modelLoc, false, model as Float32Array);
     drawModel(vertexPosLoc, vertexNormalLoc, vertexUvLoc, renderObj);
 }
 
 const inputHandlers = {
-    'ArrowLeft': () => {rotationX += speed},
-    'ArrowRight': () => {rotationX -= speed},
-    'ArrowUp': () => {rotationY += speed},
-    'ArrowDown': () => {rotationY -= speed},
-    'Q': () => {scale -= speed * 0.01},
-    'E': () => {scale += speed * 0.01},
-    'q': () => {moveX -= speed * 0.1},
-    'e': () => {moveX += speed * 0.1},
+    'w': () => {
+        let movement = vec3.scale(vec3.create(), cameraFront, cameraSpeed);
+        vec3.add(cameraPos, cameraPos, movement);
+    },
+    's': () => {
+        let movement = vec3.scale(vec3.create(), cameraFront, cameraSpeed);
+        vec3.sub(cameraPos, cameraPos, movement);
+    },
+    'a': () => {
+        let cameraRight = vec3.cross(vec3.create(), cameraFront, cameraUp);
+        vec3.normalize(cameraRight, cameraRight);
+        let movement = vec3.scale(vec3.create(), cameraRight, cameraSpeed);
+        vec3.sub(cameraPos, cameraPos, movement);
+    },
+    'd': () => {
+        let cameraRight = vec3.cross(vec3.create(), cameraFront, cameraUp);
+        vec3.normalize(cameraRight, cameraRight);
+        let movement = vec3.scale(vec3.create(), cameraRight, cameraSpeed);
+        vec3.add(cameraPos, cameraPos, movement);
+    },
+    'q': () => {cameraPos[1] -= speed * 0.1},
+    'e': () => {cameraPos[1] += speed * 0.1},
     '=': () => {lightIntensivity += speed * 0.5},
     '-': () => {lightIntensivity -= speed * 0.5},
     '+': () => {lightQuadratic += speed * 0.005;},
     '_': () => {lightQuadratic -= speed * 0.005;},
     '9': () => {lightLinear -= speed * 0.01;},
     '0': () => {lightLinear += speed * 0.01;},
-    'a': () => {ambient -= speed * 0.01;},
-    'd': () => {ambient += speed * 0.01;},
-    'A': () => {diff -= speed * 0.01;},
-    'D': () => {diff += speed * 0.01;},
+    'k': () => {ambient -= speed * 0.01;},
+    'l': () => {ambient += speed * 0.01;},
+    'K': () => {diff -= speed * 0.01;},
+    'L': () => {diff += speed * 0.01;},
     'z': () => {specular -= speed * 0.01;},
     'c': () => {specular += speed * 0.01;},
     '1': () => {textureMix -= speed * 0.01},
@@ -179,18 +178,42 @@ function input() {
 }
 
 function task() {
-    const bumpShader = utils.initShaderProgram(vertex.shaderPhongBumping, frag.shaderPhongBumping);
-    const normalShader = utils.initShaderProgram(vertex.shaderPhongBumping, frag.shaderPhongNormal);
-    
-    const sphere_verticesBuffer = utils.createFloatBuffer(sphereOBJ.vertices, gl.ARRAY_BUFFER);
-    const sphere_normalsBuffer = utils.createFloatBuffer(sphereOBJ.normals, gl.ARRAY_BUFFER);
-    const sphere_uvsBuffer = utils.createFloatBuffer(sphereOBJ.uvs, gl.ARRAY_BUFFER);
-    const sphere_indicesBuffer = utils.createUint16Buffer(sphereOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
+    const litShader = utils.initShaderProgram(vertex.shaderPhongBumping, frag.shaderPhongNormal);
 
-    const rock_verticesBuffer = utils.createFloatBuffer(rockOBJ.vertices, gl.ARRAY_BUFFER);
-    const rock_normalsBuffer = utils.createFloatBuffer(rockOBJ.normals, gl.ARRAY_BUFFER);
-    const rock_uvsBuffer = utils.createFloatBuffer(rockOBJ.uvs, gl.ARRAY_BUFFER);
-    const rock_indicesBuffer = utils.createUint16Buffer(rockOBJ.indices, gl.ELEMENT_ARRAY_BUFFER);
+    const HUMAN = {
+        model: {
+            elementsCount: humanOBJ.indices.length,
+            verticesBuffer: utils.createFloatBuffer(humanOBJ.vertices, gl.ARRAY_BUFFER),
+            normalsBuffer: utils.createFloatBuffer(humanOBJ.normals, gl.ARRAY_BUFFER),
+            uvsBuffer: utils.createFloatBuffer(humanOBJ.uvs, gl.ARRAY_BUFFER),
+            indicesBuffer: utils.createUint16Buffer(humanOBJ.indices, gl.ELEMENT_ARRAY_BUFFER)
+        },
+        pos: [0.0, 0.0, -6.0],
+        scale: [1, 1, 1],
+        texture: undefined,
+        repeat: 1
+    };
+
+    const WHALL = {
+        model: {
+            elementsCount: cubeOBJ.indices.length,
+            verticesBuffer: utils.createFloatBuffer(cubeOBJ.vertices, gl.ARRAY_BUFFER),
+            normalsBuffer: utils.createFloatBuffer(cubeOBJ.normals, gl.ARRAY_BUFFER),
+            uvsBuffer: utils.createFloatBuffer(cubeOBJ.uvs, gl.ARRAY_BUFFER),
+            indicesBuffer: utils.createUint16Buffer(cubeOBJ.indices, gl.ELEMENT_ARRAY_BUFFER)
+        },
+        pos: [0.0, 0.0, -6.0],
+        scale: [1, 1, 1],
+        texture: woodTexture,
+        repeat: 1
+    }
+
+    const SCENE = [
+        {...WHALL, pos: [0.0, -2, 0.0], scale: [20, 0.1, 20], repeat: 24},
+
+        {...HUMAN, pos: [-3.5, -2.0, -6.0]},
+        {...HUMAN, pos: [2.5, -2.0, -6.0]}
+    ];
 
     function render() {
         input();
@@ -201,25 +224,21 @@ function task() {
         gl.depthFunc(gl.LEQUAL);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+        let view = mat4.create();
+        let target = vec3.create();
+        vec3.add(target, cameraPos, cameraFront);
+        mat4.lookAt(view, cameraPos, target, cameraUp);
+
+        let projection = mat4.create();
+        mat4.perspective(projection, 45, 1200.0 / 800.0, 0.1, 100.0);
+
         let viewProjection = mat4.create();
-        mat4.perspective(viewProjection, 45, 1200.0 / 800.0, 0.1, 100.0);
-
+        mat4.multiply(viewProjection, projection, view);
         
-        drawObject(bumpShader, [-2.5, 0.0, -6.0], viewProjection, {
-            elementsCount: sphereOBJ.indices.length,
-            verticesBuffer: sphere_verticesBuffer,
-            normalsBuffer: sphere_normalsBuffer,
-            uvsBuffer: sphere_uvsBuffer,
-            indicesBuffer: sphere_indicesBuffer
-        }, 2, orangeTexture, orangeHeightmapTexture);
-
-        drawObject(normalShader, [2.5, -1.0, -6.0], viewProjection, {
-            elementsCount: rockOBJ.indices.length,
-            verticesBuffer: rock_verticesBuffer,
-            normalsBuffer: rock_normalsBuffer,
-            uvsBuffer: rock_uvsBuffer,
-            indicesBuffer: rock_indicesBuffer
-        }, 4.0, rockTexture, rockNormalmapTexture);
+        SCENE.forEach(obj => {
+            drawObject(litShader, obj.pos, viewProjection,
+                obj.model, obj.scale, obj.texture, emptyNormalTexture, obj.repeat);
+        })
 
         requestAnimationFrame(render);
     }
@@ -228,7 +247,7 @@ function task() {
 
 function main() {
     switch (taskId) {
-        case 'Textures':
+        case 'Exam':
             task();
             break;
     }
@@ -244,19 +263,46 @@ window.addEventListener('keyup', (event) => {
     keyPressed = undefined;
 })
 
+document.addEventListener('mousemove', (event) => {
+    if (document.pointerLockElement === document.body) {
+        cameraYaw += event.movementX * 0.1;
+        cameraPitch -= event.movementY * 0.1;
+        if (cameraPitch > 89.0) cameraPitch = 89.0;
+        if (cameraPitch < -89.0) cameraPitch = -89.0;
+        
+        let yawRad = cameraYaw * Math.PI / 180.0;
+        let pitchRad = cameraPitch * Math.PI / 180.0;
+        cameraFront[0] = Math.cos(yawRad) * Math.cos(pitchRad);
+        cameraFront[1] = Math.sin(pitchRad);
+        cameraFront[2] = Math.sin(yawRad) * Math.cos(pitchRad);
+        vec3.normalize(cameraFront, cameraFront);
+    }
+});
+
+document.addEventListener('click', () => {
+    document.body.requestPointerLock();
+});
+
 loadOBJs().then(result => {
     cubeOBJ = utils.loadObj(result.cube);
     sphereOBJ = utils.loadObj(result.sphere);
-    pigeonOBJ = utils.loadObj(result.pigeon);
-    rockOBJ = utils.loadObj(result.rock);
-    //console.log(result.snowman);
+    humanOBJ = utils.loadObj(result.human);
+    
     main();
 });
 
+function loadTexture(image: string) {
+    const imageTexture = document.getElementById(image);
+    let texture = gl.createTexture(); waitLoadTexture(imageTexture, texture);
+    imageTexture.onload = () => utils.handleTextureLoaded(imageTexture, texture);
+
+    return texture;
+}
+
 function waitLoadTexture(image, texture) {
     if (image.complete) {
-    utils.handleTextureLoaded(image, texture);
-} else {
-    image.onload = () => utils.handleTextureLoaded(image, texture);
-}
+        utils.handleTextureLoaded(image, texture);
+    } else {
+        image.onload = () => utils.handleTextureLoaded(image, texture);
+    }
 }

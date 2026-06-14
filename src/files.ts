@@ -12,10 +12,14 @@ export async function loadOBJs() {
         cube: await readFile('cube.obj'),
         sphere: await readFile('sphere3.obj'),
 
-        pigeon: await readFile('pigeon.obj'),
-        snowman: await readFile('snowman.obj'),
-        grenade: await readFile('grenade.obj'),
-        mug: await readFile('mug.obj'),
-        rock: await readFile('rock.obj')
+        human: await readFile('human.obj'),
+
+
+
+        // pigeon: await readFile('pigeon.obj'),
+        // snowman: await readFile('snowman.obj'),
+        // grenade: await readFile('grenade.obj'),
+        // mug: await readFile('mug.obj'),
+        // rock: await readFile('rock.obj')
     };
 }
