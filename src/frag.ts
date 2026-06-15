@@ -71,11 +71,64 @@ uniform sampler2D sampler;
 uniform sampler2D map;
 uniform float bumpScale;
 
+uniform sampler2D decalTexture;
+
+struct Decal {
+    vec4 position;
+    vec4 halfSize;
+    vec4 normal;
+    vec4 up;
+};
+
+layout(std140) uniform DecalsData {
+    int decalsCount;
+    int _pad0; int _pad1; int _pad2; // Padding for correct memory layout
+    Decal decals[256];
+};
+const int MAX_DECALS = 256;
+
 in vec3 vPosition;
 in vec3 vNormal;
 in vec2 vUV;
 
 out vec4 outColor;
+
+vec3 getDecalLocalPos(vec3 worldPos, vec3 decalPosition, vec3 decalNormal, vec3 decalUp) {
+    vec3 decalToFragment = worldPos - decalPosition;
+
+    vec3 decalRight = normalize(cross(decalUp, decalNormal));
+    vec3 decalLocalY = cross(decalNormal, decalRight);
+
+    mat3 rotation = mat3(decalRight, decalLocalY, decalNormal);
+    return decalToFragment * rotation;
+}
+
+vec3 getDecalColor(vec3 worldPos, vec3 worldNormal, vec3 baseColor) {
+    vec3 resultColor = baseColor;
+
+    for (int i = 0; i < MAX_DECALS; i++) {
+        if (i >= decalsCount) break;
+
+        Decal decal = decals[i];
+        vec3 decalNormal = normalize(decal.normal.xyz);
+        vec3 decalUp = normalize(decal.up.xyz);
+        vec3 localPos = getDecalLocalPos(worldPos, decal.position.xyz, decalNormal, decalUp);
+
+        if (
+            abs(localPos.x) <= decal.halfSize.x &&
+            abs(localPos.y) <= decal.halfSize.y &&
+            abs(localPos.z) <= decal.halfSize.z
+        ) {
+            if (dot(worldNormal, decalNormal) > 0.1) {
+                vec2 decalUV = localPos.xy / (decal.halfSize.xy * 2.0) + 0.5;
+                vec4 decalColor = texture(decalTexture, decalUV);
+                resultColor = mix(resultColor, decalColor.rgb, decalColor.a);
+            }    
+        }
+    }
+
+    return resultColor;
+}
 
 void main() {
     // U and V directions
@@ -119,6 +172,7 @@ void main() {
 
     vec4 textureColor = texture(sampler, vUV);
     vec4 color = tint * textureColor;
+    color.rgb = getDecalColor(vPosition, normal, color.rgb);
     
     outColor = vec4(lightWeighting.rgb * color.rgb, 1.0);
 }

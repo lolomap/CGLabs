@@ -2,7 +2,7 @@ let canvas: HTMLCanvasElement;
 export let gl: WebGL2RenderingContext;
 
 export function setupGL() {
-    const canvas : HTMLCanvasElement = document.getElementById("canvas") as HTMLCanvasElement;
+    canvas = document.getElementById("canvas") as HTMLCanvasElement;
     gl = canvas.getContext("webgl2")!;
 }
 

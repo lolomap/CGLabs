@@ -3,6 +3,7 @@ import * as frag from './frag'
 import * as utils from './utils'
 import {mat4, vec3, ReadonlyVec3, IndexedCollection} from 'gl-matrix'
 import { loadOBJs } from './files';
+import { DecalManager } from './decals';
 
 const taskId = document.title;
 
@@ -33,12 +34,11 @@ let cubeOBJ: utils.OBJ;
 let sphereOBJ: utils.OBJ;
 let humanOBJ: utils.OBJ;
 
-// const emptyNormalImageTexture = document.getElementById("empty_normal");
-// let emptyNormalTexture = gl.createTexture(); waitLoadTexture(emptyNormalImageTexture, emptyNormalTexture);
-// emptyNormalImageTexture.onload = () => utils.handleTextureLoaded(emptyNormalImageTexture, emptyNormalTexture);
+
 
 const emptyNormalTexture = loadTexture("empty_normal");
 const woodTexture = loadTexture("wood");
+const bloodDecalTexture = loadTexture("blood_decal");
 
 
 function drawModel(
@@ -71,6 +71,7 @@ function drawObject(
     scaleModifier: IndexedCollection,
     texture: WebGLTexture,
     map: WebGLTexture,
+    decal: WebGLTexture,
     textureRepeat: number
 ) {
     gl.useProgram(shader);
@@ -112,6 +113,12 @@ function drawObject(
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, map);
         gl.uniform1i(mapLoc, 1);
+    }
+    if (decal) {
+        let decalLoc = gl.getUniformLocation(shader, 'decalTexture');
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, decal);
+        gl.uniform1i(decalLoc, 2);
     }
     
     let tintLoc = gl.getUniformLocation(shader, 'tint');
@@ -179,6 +186,7 @@ function input() {
 
 function task() {
     const litShader = utils.initShaderProgram(vertex.shaderPhongBumping, frag.shaderPhongNormal);
+    const decalManager = new DecalManager(litShader, 3);
 
     const HUMAN = {
         model: {
@@ -215,6 +223,20 @@ function task() {
         {...HUMAN, pos: [2.5, -2.0, -6.0]}
     ];
 
+    decalManager.addDecal({
+        position: [0, -2, 0],
+        halfSize: [0.5, 0.5, 1.0],
+        normal: [0, 1, 0],
+        up: [0, 0, 1]
+    });
+
+    decalManager.addDecal({
+        position: [-3.5, 0, -6.0],
+        halfSize: [0.5, 0.5, 2.5],
+        normal: [1, 0, 0],
+        up: [0, 1, 0]
+    });
+
     function render() {
         input();
 
@@ -237,7 +259,7 @@ function task() {
         
         SCENE.forEach(obj => {
             drawObject(litShader, obj.pos, viewProjection,
-                obj.model, obj.scale, obj.texture, emptyNormalTexture, obj.repeat);
+                obj.model, obj.scale, obj.texture, emptyNormalTexture, bloodDecalTexture, obj.repeat);
         })
 
         requestAnimationFrame(render);
@@ -293,7 +315,8 @@ loadOBJs().then(result => {
 
 function loadTexture(image: string) {
     const imageTexture = document.getElementById(image);
-    let texture = gl.createTexture(); waitLoadTexture(imageTexture, texture);
+    let texture = gl.createTexture();
+    waitLoadTexture(imageTexture, texture);
     imageTexture.onload = () => utils.handleTextureLoaded(imageTexture, texture);
 
     return texture;
