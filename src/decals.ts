@@ -11,7 +11,7 @@ export class DecalData {
 }
 
 export class DecalManager {
-    MAX_DECALS = 256;
+    MAX_DECALS = 255;
     BUFFER_SIZE = 16 + this.MAX_DECALS * 64;
     count = 0;
 

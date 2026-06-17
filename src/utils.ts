@@ -75,6 +75,7 @@ export type SceneObj = {
     pos: vec3,
     scale: vec3,
     texture: WebGLTexture,
+    decalTexture: WebGLTexture,
     repeat: number
 }
 

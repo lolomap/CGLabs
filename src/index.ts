@@ -41,6 +41,7 @@ let decalManager: DecalManager;
 const emptyNormalTexture = loadTexture("empty_normal");
 const woodTexture = loadTexture("wood");
 const bloodDecalTexture = loadTexture("blood_decal");
+const bulletDecalTexture = loadTexture("bullet_decal");
 
 
 function drawModel(
@@ -214,6 +215,7 @@ function task() {
         pos: [0.0, 0.0, -6.0],
         scale: [1, 1, 1],
         texture: undefined,
+        decalTexture: bloodDecalTexture,
         repeat: 1,
     };
 
@@ -229,6 +231,7 @@ function task() {
         pos: [0.0, 0.0, -6.0],
         scale: [1, 1, 1],
         texture: woodTexture,
+        decalTexture: bulletDecalTexture,
         repeat: 1
     }
 
@@ -257,7 +260,7 @@ function task() {
         
         SCENE.forEach(obj => {
             drawObject(litShader, obj.pos, viewProjection,
-                obj.render, obj.scale, obj.texture, emptyNormalTexture, bloodDecalTexture, obj.repeat);
+                obj.render, obj.scale, obj.texture, emptyNormalTexture, obj.decalTexture, obj.repeat);
         })
 
         requestAnimationFrame(render);
@@ -315,7 +318,7 @@ document.addEventListener('click', (event) => {
 
         decalManager.addDecal({
             position: hit.hitPosition,
-            halfSize: [0.5, 0.5, 0.1],
+            halfSize: [0.25, 0.25, 0.1],
             normal: hit.hitNormal,
             up: up
         });

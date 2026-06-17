@@ -83,9 +83,9 @@ struct Decal {
 layout(std140) uniform DecalsData {
     int decalsCount;
     int _pad0; int _pad1; int _pad2; // Padding for correct memory layout
-    Decal decals[256];
+    Decal decals[255];
 };
-const int MAX_DECALS = 256;
+const int MAX_DECALS = 255;
 
 in vec3 vPosition;
 in vec3 vNormal;
