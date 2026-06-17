@@ -1,9 +1,10 @@
 import * as vertex from './vert'
 import * as frag from './frag'
 import * as utils from './utils'
-import {mat4, vec3, ReadonlyVec3, IndexedCollection} from 'gl-matrix'
+import {mat4, vec3, ReadonlyVec3} from 'gl-matrix'
 import { loadOBJs } from './files';
 import { DecalManager } from './decals';
+import { getRayFromCamera, hitScan } from './raycasting';
 
 const taskId = document.title;
 
@@ -33,7 +34,8 @@ const gl = utils.gl;
 let cubeOBJ: utils.OBJ;
 let sphereOBJ: utils.OBJ;
 let humanOBJ: utils.OBJ;
-
+let SCENE: Array<utils.SceneObj>;
+let decalManager: DecalManager;
 
 
 const emptyNormalTexture = loadTexture("empty_normal");
@@ -68,7 +70,7 @@ function drawObject(
     pos: ReadonlyVec3,
     viewProjection: mat4,
     renderObj: utils.RenderObj,
-    scaleModifier: IndexedCollection,
+    scaleModifier: vec3,
     texture: WebGLTexture,
     map: WebGLTexture,
     decal: WebGLTexture,
@@ -184,12 +186,25 @@ function input() {
         handler();
 }
 
+function getCameraMatrix() {
+    let view = mat4.create();
+    let target = vec3.create();
+    vec3.add(target, cameraPos, cameraFront);
+    mat4.lookAt(view, cameraPos, target, cameraUp);
+
+    let projection = mat4.create();
+    mat4.perspective(projection, 45, 1200.0 / 800.0, 0.1, 100.0);
+
+    return {view, projection};
+}
+
 function task() {
     const litShader = utils.initShaderProgram(vertex.shaderPhongBumping, frag.shaderPhongNormal);
-    const decalManager = new DecalManager(litShader, 3);
+    decalManager = new DecalManager(litShader);
 
     const HUMAN = {
-        model: {
+        model: humanOBJ,
+        render: {
             elementsCount: humanOBJ.indices.length,
             verticesBuffer: utils.createFloatBuffer(humanOBJ.vertices, gl.ARRAY_BUFFER),
             normalsBuffer: utils.createFloatBuffer(humanOBJ.normals, gl.ARRAY_BUFFER),
@@ -199,11 +214,12 @@ function task() {
         pos: [0.0, 0.0, -6.0],
         scale: [1, 1, 1],
         texture: undefined,
-        repeat: 1
+        repeat: 1,
     };
 
     const WHALL = {
-        model: {
+        model: cubeOBJ,
+        render: {
             elementsCount: cubeOBJ.indices.length,
             verticesBuffer: utils.createFloatBuffer(cubeOBJ.vertices, gl.ARRAY_BUFFER),
             normalsBuffer: utils.createFloatBuffer(cubeOBJ.normals, gl.ARRAY_BUFFER),
@@ -216,26 +232,13 @@ function task() {
         repeat: 1
     }
 
-    const SCENE = [
-        {...WHALL, pos: [0.0, -2, 0.0], scale: [20, 0.1, 20], repeat: 24},
+    SCENE = [
+        {...WHALL, pos: [0.0, -4, 0.0], scale: [20, 2.0, 20], repeat: 24},
+        {...WHALL, pos: [0.0, 0.0, -4.0], scale: [1, 1, 1]},
 
         {...HUMAN, pos: [-3.5, -2.0, -6.0]},
         {...HUMAN, pos: [2.5, -2.0, -6.0]}
     ];
-
-    decalManager.addDecal({
-        position: [0, -2, 0],
-        halfSize: [0.5, 0.5, 1.0],
-        normal: [0, 1, 0],
-        up: [0, 0, 1]
-    });
-
-    decalManager.addDecal({
-        position: [-3.5, 0, -6.0],
-        halfSize: [0.5, 0.5, 2.5],
-        normal: [1, 0, 0],
-        up: [0, 1, 0]
-    });
 
     function render() {
         input();
@@ -246,20 +249,15 @@ function task() {
         gl.depthFunc(gl.LEQUAL);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        let view = mat4.create();
-        let target = vec3.create();
-        vec3.add(target, cameraPos, cameraFront);
-        mat4.lookAt(view, cameraPos, target, cameraUp);
-
-        let projection = mat4.create();
-        mat4.perspective(projection, 45, 1200.0 / 800.0, 0.1, 100.0);
+        const camera = getCameraMatrix();
+        const view = camera.view; const projection = camera.projection;
 
         let viewProjection = mat4.create();
         mat4.multiply(viewProjection, projection, view);
         
         SCENE.forEach(obj => {
             drawObject(litShader, obj.pos, viewProjection,
-                obj.model, obj.scale, obj.texture, emptyNormalTexture, bloodDecalTexture, obj.repeat);
+                obj.render, obj.scale, obj.texture, emptyNormalTexture, bloodDecalTexture, obj.repeat);
         })
 
         requestAnimationFrame(render);
@@ -301,8 +299,27 @@ document.addEventListener('mousemove', (event) => {
     }
 });
 
-document.addEventListener('click', () => {
+document.addEventListener('click', (event) => {
     document.body.requestPointerLock();
+
+    if (event.button !== 0) return;
+
+    const ray = getRayFromCamera(cameraPos, cameraFront);
+    const hit = hitScan(ray.origin, ray.direction, SCENE);
+    
+    if (hit.hitPosition && hit.hitNormal) {
+        let up: vec3 = [0, 1, 0];
+        if (Math.abs(vec3.dot(hit.hitNormal, up)) > 0.9) { // Decal is on XZ
+            up = [0, 0, 1];
+        }
+
+        decalManager.addDecal({
+            position: hit.hitPosition,
+            halfSize: [0.5, 0.5, 0.1],
+            normal: hit.hitNormal,
+            up: up
+        });
+    }
 });
 
 loadOBJs().then(result => {

@@ -1,3 +1,5 @@
+import { vec3 } from "gl-matrix";
+
 let canvas: HTMLCanvasElement;
 export let gl: WebGL2RenderingContext;
 
@@ -56,6 +58,9 @@ export type OBJ = {
     normals: Float32Array<ArrayBuffer>;
     uvs: Float32Array<ArrayBuffer>;
     indices: Uint16Array<ArrayBuffer>;
+
+    aabbMin: vec3;
+    aabbMax: vec3;
 }
 export type RenderObj = {
     elementsCount: number,
@@ -63,6 +68,14 @@ export type RenderObj = {
     normalsBuffer: WebGLBuffer,
     uvsBuffer: WebGLBuffer,
     indicesBuffer: WebGLBuffer
+}
+export type SceneObj = {
+    model: OBJ,
+    render: RenderObj,
+    pos: vec3,
+    scale: vec3,
+    texture: WebGLTexture,
+    repeat: number
 }
 
 export function loadObj(data: string): OBJ {
@@ -147,11 +160,25 @@ export function loadObj(data: string): OBJ {
             }
         }
     }
+
+    let aabbMin: vec3 = [Infinity, Infinity, Infinity];
+    let aabbMax: vec3 = [-Infinity, -Infinity, -Infinity];
+
+    for (let i = 0; i < outPositions.length; i+= 3) {
+        const x = outPositions[i], y = outPositions[i+1], z = outPositions[i+2];
+        if (x < aabbMin[0]) aabbMin[0] = x; if (x > aabbMax[0]) aabbMax[0] = x;
+        if (y < aabbMin[1]) aabbMin[1] = y; if (y > aabbMax[1]) aabbMax[1] = y;
+        if (z < aabbMin[2]) aabbMin[2] = z; if (z > aabbMax[2]) aabbMax[2] = z;
+    }
+
     return {
         vertices: new Float32Array(outPositions),
         normals: new Float32Array(outNormals),
         uvs: new Float32Array(outUVs),
-        indices: new Uint16Array(indices)
+        indices: new Uint16Array(indices),
+
+        aabbMin: aabbMin,
+        aabbMax: aabbMax
     };
 }
 
